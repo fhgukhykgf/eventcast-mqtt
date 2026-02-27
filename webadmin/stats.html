@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>详细统计 · 活动快传</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+
+        /* 头部样式 */
+        .header {
+            background: #1890ff;
+            color: white;
+            padding: 16px 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .logo {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-name {
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .nav {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .nav a {
+            color: white;
+            text-decoration: none;
+            padding: 4px 0;
+            border-bottom: 2px solid transparent;
+            transition: border-color 0.3s;
+        }
+
+        .nav a:hover {
+            border-bottom-color: rgba(255,255,255,0.5);
+        }
+
+        .nav a.active {
+            border-bottom-color: white;
+        }
+
+        /* 容器 */
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        /* 卡片样式 */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 统计网格 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1890ff;
+        }
+
+        .stat-unit {
+            font-size: 14px;
+            color: #999;
+            margin-left: 4px;
+        }
+
+        /* 图表容器 */
+        .chart-wrapper {
+            height: 300px;
+            width: 100%;
+        }
+
+        /* 选择器 */
+        .select-control {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .select-control:focus {
+            border-color: #1890ff;
+        }
+
+        /* 热门活动列表 */
+        .rank-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .rank-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.3s;
+        }
+
+        .rank-item:hover {
+            background: #f5f5f5;
+        }
+
+        .rank-index {
+            width: 30px;
+            height: 30px;
+            background: #1890ff;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .rank-index.gold {
+            background: #fadb14;
+            color: #333;
+        }
+
+        .rank-index.silver {
+            background: #bfbfbf;
+            color: white;
+        }
+
+        .rank-index.bronze {
+            background: #d48806;
+            color: white;
+        }
+
+        .rank-info {
+            flex: 1;
+        }
+
+        .rank-name {
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #333;
+        }
+
+        .rank-stats {
+            font-size: 12px;
+            color: #999;
+        }
+
+        /* 加载状态 */
+        .loading {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid #f0f0f0;
+            border-top-color: #1890ff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.3;
+        }
+
+        /* 错误提示 */
+        .error-message {
+            background: #fff1f0;
+            color: #ff4d4f;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            border-left: 4px solid #ff4d4f;
+        }
+
+        /* 工具条 */
+        .toolbar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .nav {
+                gap: 16px;
+            }
+
+            .toolbar {
+                flex-direction: column;
+            }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName">赵组织</span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="dashboard.html">数据看板</a>
+            <a href="events.html">活动管理</a>
+            <a href="stats.html" class="active">详细统计</a>
+            <a href="qrcode.html">签到二维码</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 统计卡片 -->
+        <div class="stats-grid" id="statsCards">
+            <div class="stat-card">
+                <div class="stat-label">总活动数</div>
+                <div class="stat-value" id="totalEvents">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总报名人数</div>
+                <div class="stat-value" id="totalApply">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总签到人数</div>
+                <div class="stat-value" id="totalSign">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均签到率</div>
+                <div class="stat-value" id="avgRate">0<span class="stat-unit">%</span></div>
+            </div>
+        </div>
+
+        <!-- 工具条 -->
+        <div class="toolbar">
+            <select class="select-control" id="timeRange" onchange="loadAllStats()">
+                <option value="7">最近7天</option>
+                <option value="30">最近30天</option>
+                <option value="90">最近90天</option>
+                <option value="365">全年</option>
+            </select>
+
+            <select class="select-control" id="chartType" onchange="loadAllStats()">
+                <option value="bar">柱状图</option>
+                <option value="line">折线图</option>
+            </select>
+        </div>
+
+        <!-- 活动报名/签到对比图表 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📊 活动报名/签到对比</div>
+                <select class="select-control" id="compareLimit" onchange="loadCompareChart()" style="width: 100px;">
+                    <option value="5">TOP 5</option>
+                    <option value="10" selected>TOP 10</option>
+                    <option value="15">TOP 15</option>
+                    <option value="20">TOP 20</option>
+                </select>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="compareChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 第二行：签到时间分布 + 热门活动排行 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- 签到时间分布 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">⏰ 签到时间分布</div>
+                </div>
+                <div class="chart-wrapper" style="height: 250px;">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 热门活动排行 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🏆 热门活动排行</div>
+                </div>
+                <div id="hotEvents" class="rank-list"></div>
+            </div>
+        </div>
+
+        <!-- 活动趋势分析 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📈 活动趋势分析</div>
+                <select class="select-control" id="trendType" onchange="loadTrendChart()">
+                    <option value="apply">报名趋势</option>
+                    <option value="sign">签到趋势</option>
+                    <option value="both" selected>两者对比</option>
+                </select>
+            </div>
+            <div class="chart-wrapper" style="height: 300px;">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.64:8000/api';  // 修改为你的服务器IP
+        let compareChart = null;
+        let timeChart = null;
+        let trendChart = null;
+
+        // 检查登录
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            const user = localStorage.getItem('admin_user');
+
+            if (!token || !user) {
+                window.location.href = 'index.html';
+                return false;
+            }
+
+            try {
+                const userInfo = JSON.parse(user);
+                document.getElementById('userName').textContent = userInfo.real_name || '管理员';
+            } catch (e) {
+                console.error('解析用户信息失败:', e);
+            }
+
+            return true;
+        }
+
+        // 退出登录
+        function handleLogout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        // 加载所有统计数据
+        async function loadAllStats() {
+            try {
+                // 显示加载状态
+                showLoading();
+
+                const response = await fetch(`${API_BASE}/events/list?limit=100`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    const events = result.data || [];
+
+                    // 更新统计卡片
+                    updateStatsCards(events);
+
+                    // 更新图表
+                    loadCompareChart(events);
+                    loadTimeChart(events);
+                    loadHotEvents(events);
+                    loadTrendChart(events);
+                } else {
+                    showError('加载数据失败：' + (result.msg || '未知错误'));
+                }
+            } catch (err) {
+                console.error('加载失败:', err);
+                showError('网络错误，请检查后端服务');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // 更新统计卡片
+        function updateStatsCards(events) {
+            const totalEvents = events.length;
+            let totalApply = 0, totalSign = 0;
+
+            events.forEach(e => {
+                totalApply += e.apply_count || 0;
+                totalSign += e.sign_count || 0;
+            });
+
+            const avgRate = totalApply ? Math.round(totalSign / totalApply * 100) : 0;
+
+            document.getElementById('totalEvents').textContent = totalEvents;
+            document.getElementById('totalApply').textContent = totalApply;
+            document.getElementById('totalSign').textContent = totalSign;
+            document.getElementById('avgRate').textContent = avgRate;
+        }
+
+        // 加载对比图表
+        function loadCompareChart(events = null) {
+            if (!events) {
+                // 如果没有传入events，从API获取
+                fetch(`${API_BASE}/events/list?limit=100`)
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.code === 200) {
+                            renderCompareChart(result.data || []);
+                        }
+                    })
+                    .catch(err => console.error('加载对比图表失败:', err));
+                return;
+            }
+
+            renderCompareChart(events);
+        }
+
+        // 渲染对比图表
+        function renderCompareChart(events) {
+            const ctx = document.getElementById('compareChart').getContext('2d');
+            const limit = parseInt(document.getElementById('compareLimit').value);
+
+            // 按报名人数排序，取前N个
+            const sortedEvents = [...events]
+                .sort((a, b) => (b.apply_count || 0) - (a.apply_count || 0))
+                .slice(0, limit);
+
+            const labels = sortedEvents.map(e => e.title.length > 8 ? e.title.substr(0,8)+'...' : e.title);
+            const applyData = sortedEvents.map(e => e.apply_count || 0);
+            const signData = sortedEvents.map(e => e.sign_count || 0);
+
+            // 销毁旧图表
+            if (compareChart) {
+                compareChart.destroy();
+            }
+
+            compareChart = new Chart(ctx, {
+                type: document.getElementById('chartType').value,
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '报名人数',
+                            data: applyData,
+                            backgroundColor: '#1890ff',
+                            borderColor: '#1890ff',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '签到人数',
+                            data: signData,
+                            backgroundColor: '#52c41a',
+                            borderColor: '#52c41a',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 加载时间分布图
+        function loadTimeChart(events) {
+            const ctx = document.getElementById('timeChart').getContext('2d');
+
+            // 生成时间分布数据（模拟，实际应该从签到记录统计）
+            const hours = [];
+            const data = [];
+
+            for (let i = 0; i < 24; i++) {
+                hours.push(i + ':00');
+                // 生成正态分布数据，高峰在9-11点和14-16点
+                let value = 5;
+                if (i >= 9 && i <= 11) value = 25 + Math.floor(Math.random() * 10);
+                else if (i >= 14 && i <= 16) value = 30 + Math.floor(Math.random() * 15);
+                else if (i >= 19 && i <= 21) value = 15 + Math.floor(Math.random() * 10);
+                else value = 3 + Math.floor(Math.random() * 5);
+                data.push(value);
+            }
+
+            if (timeChart) {
+                timeChart.destroy();
+            }
+
+            timeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [{
+                        label: '签到人数',
+                        data: data,
+                        borderColor: '#faad14',
+                        backgroundColor: 'rgba(250,173,20,0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#faad14'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 加载热门活动排行
+        function loadHotEvents(events) {
+            const hotEvents = [...events]
+                .sort((a, b) => (b.apply_count || 0) - (a.apply_count || 0))
+                .slice(0, 15);
+
+            const container = document.getElementById('hotEvents');
+
+            if (hotEvents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>暂无活动数据</div></div>';
+                return;
+            }
+
+            let html = '';
+            hotEvents.forEach((e, i) => {
+                const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                html += `
+                    <div class="rank-item">
+                        <div class="rank-index ${rankClass}">${i + 1}</div>
+                        <div class="rank-info">
+                            <div class="rank-name">${e.title}</div>
+                            <div class="rank-stats">
+                                报名: ${e.apply_count || 0} · 签到: ${e.sign_count || 0} · 签到率: ${e.sign_rate}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 加载趋势图
+        function loadTrendChart(events = null) {
+            if (!events) {
+                fetch(`${API_BASE}/events/list?limit=100`)
+                    .then(res => res.json())
+                    .then(result => {
+                        if (result.code === 200) {
+                            renderTrendChart(result.data || []);
+                        }
+                    })
+                    .catch(err => console.error('加载趋势图失败:', err));
+                return;
+            }
+
+            renderTrendChart(events);
+        }
+
+        // 渲染趋势图
+        function renderTrendChart(events) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const days = parseInt(document.getElementById('timeRange').value);
+            const trendType = document.getElementById('trendType').value;
+
+            // 生成日期标签
+            const labels = [];
+            const applyData = [];
+            const signData = [];
+
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+
+                // 模拟数据
+                applyData.push(Math.floor(Math.random() * 20) + 10);
+                signData.push(Math.floor(Math.random() * 15) + 5);
+            }
+
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            const datasets = [];
+
+            if (trendType === 'apply' || trendType === 'both') {
+                datasets.push({
+                    label: '报名人数',
+                    data: applyData,
+                    borderColor: '#1890ff',
+                    backgroundColor: 'rgba(24,144,255,0.1)',
+                    borderWidth: 2,
+                    fill: trendType === 'both' ? false : true,
+                    tension: 0.4
+                });
+            }
+
+            if (trendType === 'sign' || trendType === 'both') {
+                datasets.push({
+                    label: '签到人数',
+                    data: signData,
+                    borderColor: '#52c41a',
+                    backgroundColor: 'rgba(82,196,26,0.1)',
+                    borderWidth: 2,
+                    fill: trendType === 'both' ? false : true,
+                    tension: 0.4
+                });
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { usePointStyle: true }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            // 可以添加加载动画
+        }
+
+        // 隐藏加载状态
+        function hideLoading() {
+            // 隐藏加载动画
+        }
+
+        // 显示错误
+        function showError(msg) {
+            const container = document.querySelector('.container');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.innerHTML = `❌ ${msg}`;
+            container.insertBefore(errorDiv, container.firstChild);
+
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+
+        // 初始化
+        if (checkAuth()) {
+            loadAllStats();
+            // 每60秒刷新一次
+            setInterval(loadAllStats, 60000);
+        }
+    </script>
+</body>
+</html>

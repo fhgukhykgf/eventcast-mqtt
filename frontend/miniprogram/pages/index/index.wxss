@@ -1,0 +1,188 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding-bottom: 20rpx;
+}
+
+/* 用户信息 */
+.user-section {
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  padding: 40rpx 30rpx 30rpx;
+  color: white;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.avatar {
+  width: 100rpx;
+  height: 100rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255,255,255,0.3);
+  margin-right: 20rpx;
+}
+
+.user-name {
+  font-size: 36rpx;
+  font-weight: 600;
+  display: block;
+}
+
+.user-role {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+.stats {
+  display: flex;
+  background: rgba(255,255,255,0.1);
+  border-radius: 16rpx;
+  padding: 20rpx;
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 36rpx;
+  font-weight: 700;
+  display: block;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  opacity: 0.9;
+}
+
+/* 快捷入口 */
+.quick-actions {
+  display: flex;
+  background: white;
+  margin: -30rpx 30rpx 20rpx;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
+}
+
+.action-item {
+  flex: 1;
+  text-align: center;
+}
+
+.action-icon {
+  width: 80rpx;
+  height: 80rpx;
+  line-height: 80rpx;
+  border-radius: 50%;
+  margin: 0 auto 16rpx;
+  font-size: 40rpx;
+}
+
+.action-icon.scan {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.action-icon.events {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+/* 内容区域 */
+.section {
+  background: white;
+  margin: 20rpx 30rpx;
+  border-radius: 16rpx;
+  padding: 30rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+}
+
+.section-more {
+  font-size: 24rpx;
+  color: #999;
+}
+
+/* 活动列表 */
+.event-item {
+  padding: 20rpx 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-title {
+  font-size: 28rpx;
+  font-weight: 500;
+  color: #333;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.event-time {
+  font-size: 24rpx;
+  color: #999;
+  margin-right: 20rpx;
+}
+
+.event-location {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.event-status {
+  display: inline-block;
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 20rpx;
+  margin-left: 20rpx;
+}
+
+.event-status.signed {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.event-status.pending {
+  background: #fff2e8;
+  color: #faad14;
+}
+
+/* 加载中 */
+.loading-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255,255,255,0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading {
+  width: 60rpx;
+  height: 60rpx;
+  margin-bottom: 20rpx;
+}

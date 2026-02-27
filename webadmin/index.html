@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活动快传 · 管理后台登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            width: 400px;
+            max-width: 90%;
+            padding: 40px;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo h1 {
+            font-size: 32px;
+            color: #1890ff;
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            border-color: #1890ff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(24,144,255,0.1);
+        }
+
+        .form-input.error {
+            border-color: #ff4d4f;
+        }
+
+        .error-message {
+            color: #ff4d4f;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #1890ff, #096dd9);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .login-btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(24,144,255,0.3);
+        }
+
+        .login-btn:disabled {
+            background: #d9d9d9;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .test-accounts {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .test-accounts h4 {
+            color: #666;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .account-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .account-item:hover {
+            background: #e8e8e8;
+        }
+
+        .account-role {
+            color: #1890ff;
+            font-weight: 500;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>🎯 活动快传</h1>
+            <p>管理后台 · 请登录</p>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">用户名 / 学号</label>
+            <input type="text" class="form-input" id="username" placeholder="请输入用户名或学号" autocomplete="off">
+            <div class="error-message" id="usernameError"></div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">密码</label>
+            <input type="password" class="form-input" id="password" placeholder="请输入密码">
+            <div class="error-message" id="passwordError"></div>
+        </div>
+
+        <button class="login-btn" id="loginBtn" onclick="handleLogin()">登 录</button>
+
+        <div class="test-accounts">
+            <h4>📋 测试账号（点击自动填充）</h4>
+            <div class="account-item" onclick="fillAccount('admin', 'admin123')">
+                <span class="account-role">管理员</span>
+                <span>admin / admin123</span>
+            </div>
+            <div class="account-item" onclick="fillAccount('O2023001', '123456')">
+                <span class="account-role">组织者</span>
+                <span>O2023001 / 123456</span>
+            </div>
+            <div class="account-item" onclick="fillAccount('20230001', '123456')">
+                <span class="account-role">学生</span>
+                <span>20230001 / 123456</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.64:8000/api';
+
+        // 填充账号
+        function fillAccount(username, password) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = password;
+        }
+
+        // 显示错误
+        function showError(field, message) {
+            const input = document.getElementById(field);
+            const errorDiv = document.getElementById(field + 'Error');
+            input.classList.add('error');
+            errorDiv.style.display = 'block';
+            errorDiv.textContent = message;
+        }
+
+        // 清除错误
+        function clearErrors() {
+            document.querySelectorAll('.form-input').forEach(input => {
+                input.classList.remove('error');
+            });
+            document.querySelectorAll('.error-message').forEach(div => {
+                div.style.display = 'none';
+            });
+        }
+
+        // 设置加载状态
+        function setLoading(loading) {
+            const btn = document.getElementById('loginBtn');
+            if (loading) {
+                btn.innerHTML = '<span class="loading"></span> 登录中...';
+                btn.disabled = true;
+            } else {
+                btn.innerHTML = '登 录';
+                btn.disabled = false;
+            }
+        }
+
+        // 保存登录状态
+        function saveLogin(userInfo, token) {
+            localStorage.setItem('admin_token', token);
+            localStorage.setItem('admin_user', JSON.stringify(userInfo));
+            localStorage.setItem('admin_login_time', Date.now());
+        }
+
+        // 处理登录
+        async function handleLogin() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+
+            clearErrors();
+
+            if (!username) {
+                showError('username', '请输入用户名');
+                return;
+            }
+
+            if (!password) {
+                showError('password', '请输入密码');
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/users/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: username,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    const { user_info, token } = result.data;
+
+                    // 检查是否有管理权限
+                    if (user_info.role !== 'admin' && user_info.role !== 'organizer') {
+                        alert('您的账号没有管理后台权限');
+                        setLoading(false);
+                        return;
+                    }
+
+                    saveLogin(user_info, token);
+
+                    // 跳转到看板
+                    window.location.href = 'dashboard.html';
+                } else {
+                    showError('username', result.msg || '登录失败');
+                }
+            } catch (err) {
+                console.error('登录请求失败:', err);
+                alert('网络错误，请稍后重试');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // 检查是否已登录
+        function checkLogin() {
+            const token = localStorage.getItem('admin_token');
+            const loginTime = localStorage.getItem('admin_login_time');
+
+            if (!token || !loginTime) {
+                return false;
+            }
+
+            // 检查是否过期（24小时）
+            const now = Date.now();
+            if (now - parseInt(loginTime) > 24 * 60 * 60 * 1000) {
+                localStorage.clear();
+                return false;
+            }
+
+            return true;
+        }
+
+        // 如果已登录，自动跳转
+        if (checkLogin()) {
+            window.location.href = 'dashboard.html';
+        }
+
+        // 回车登录
+        document.getElementById('password').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+    </script>
+</body>
+</html>

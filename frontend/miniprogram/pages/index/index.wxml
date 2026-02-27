@@ -1,0 +1,97 @@
+<view class="page">
+  <!-- 用户信息 -->
+  <view class="user-section">
+    <view class="user-info">
+      <image class="avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}"></image>
+      <view class="user-detail">
+        <text class="user-name">{{userInfo.real_name || userInfo.user_name || '用户'}}</text>
+        <text class="user-role">
+          {{userInfo.role === 'student' ? '学生' :
+            userInfo.role === 'teacher' ? '教师' :
+            userInfo.role === 'organizer' ? '组织者' :
+            userInfo.role === 'admin' ? '管理员' : '游客'}}
+        </text>
+      </view>
+    </view>
+
+    <!-- 统计数据 -->
+    <view class="stats">
+      <view class="stat-item">
+        <text class="stat-value">{{stats.totalEvents || 0}}</text>
+        <text class="stat-label">参与活动</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.signedEvents || 0}}</text>
+        <text class="stat-label">已签到</text>
+      </view>
+      <view class="stat-item">
+        <text class="stat-value">{{stats.signRate || '0%'}}</text>
+        <text class="stat-label">签到率</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 快捷入口 -->
+  <view class="quick-actions">
+    <view class="action-item" bindtap="onScanTap">
+      <view class="action-icon scan">📷</view>
+      <text>扫码签到</text>
+    </view>
+    <view class="action-item" bindtap="onViewAllEvents">
+      <view class="action-icon events">📋</view>
+      <text>活动列表</text>
+    </view>
+  </view>
+
+  <!-- 即将开始的活动 -->
+  <view class="section" wx:if="{{upcomingEvents && upcomingEvents.length > 0}}">
+    <view class="section-header">
+      <text class="section-title">即将开始</text>
+      <text class="section-more" bindtap="onViewAllEvents">查看更多 ></text>
+    </view>
+    <view class="event-list">
+      <block wx:for="{{upcomingEvents}}" wx:key="event_id" wx:for-item="item">
+        <view class="event-item" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+          <text class="event-title">{{item.title || '无标题'}}</text>
+          <text class="event-time">🕒 {{formatTime(item.time)}}</text>
+          <text class="event-location">📍 {{item.location || '未知地点'}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 最近参与的活动 -->
+<!-- 在“最近参与”部分修改状态显示 -->
+<view class="section" wx:if="{{recentEvents && recentEvents.length > 0}}">
+  <view class="section-header">
+    <text class="section-title">最近参与</text>
+  </view>
+  <view class="event-list">
+    <block wx:for="{{recentEvents}}" wx:key="event_id" wx:for-item="item">
+      <view class="event-item" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+        <view class="event-info">
+          <text class="event-title">{{item.event_title || item.title}}</text>
+          <text class="event-time">🕒 {{formatTime(item.event_time || item.time)}}</text>
+          <text class="event-location">📍 {{item.event_location || item.location}}</text>
+        </view>
+        <text class="event-status {{getEventStatusClass(item)}}">
+          {{getEventStatusText(item)}}
+        </text>
+      </view>
+    </block>
+  </view>
+</view>
+  <!-- 加载中 -->
+  <view class="loading-mask" wx:if="{{loading}}">
+    <view class="loading"></view>
+    <text>加载中...</text>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:elif="{{(!upcomingEvents || upcomingEvents.length === 0) && (!recentEvents || recentEvents.length === 0)}}">
+    <image class="empty-icon" src="/images/empty-events.png"></image>
+    <text class="empty-text">暂无活动数据</text>
+  </view>
+
+
+</view>

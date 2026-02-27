@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>活动管理 · 活动快传</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName"></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="dashboard.html">数据看板</a>
+            <a href="events.html" class="active">活动管理</a>
+            <a href="stats.html">详细统计</a>
+            <a href="qrcode.html">签到二维码</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <input type="text" class="search-input" id="searchInput" placeholder="搜索活动名称或地点...">
+            <button class="btn btn-primary" onclick="openCreateModal()">➕ 新建活动</button>
+            <button class="btn btn-success" onclick="loadEvents()">🔄 刷新</button>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>活动名称</th>
+                        <th>活动时间</th>
+                        <th>地点</th>
+                        <th>报名/签到</th>
+                        <th>签到率</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="eventsList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 活动表单弹窗 -->
+    <div class="modal" id="eventModal">
+        <div class="modal-content">
+            <div class="modal-title" id="modalTitle">新建活动</div>
+            <input type="hidden" id="eventId">
+
+            <div class="form-group">
+                <label class="form-label">活动ID <span style="color: #ff4d4f;">*</span></label>
+                <input type="text" class="form-input" id="eventIdInput" placeholder="只能包含字母、数字、下划线"
+                       oninput="this.value=this.value.replace(/[^a-zA-Z0-9_-]/g,'')">
+                <div style="font-size: 12px; color: #999; margin-top: 4px;">唯一标识，创建后不可修改</div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">活动名称 <span style="color: #ff4d4f;">*</span></label>
+                <input type="text" class="form-input" id="eventTitle" placeholder="请输入活动名称">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">活动时间 <span style="color: #ff4d4f;">*</span></label>
+                <input type="datetime-local" class="form-input" id="eventTime">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">活动地点 <span style="color: #ff4d4f;">*</span></label>
+                <input type="text" class="form-input" id="eventLocation" placeholder="请输入活动地点">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">活动描述</label>
+                <textarea class="form-input" id="eventDescription" rows="3" placeholder="请输入活动描述"></textarea>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEvent()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.64:8000/api';
+        let editingId = null;
+
+        // 检查登录
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            const user = localStorage.getItem('admin_user');
+
+            if (!token || !user) {
+                window.location.href = 'index.html';
+                return false;
+            }
+
+            document.getElementById('userName').textContent = JSON.parse(user).real_name || '管理员';
+            return true;
+        }
+
+        // 退出登录
+        function handleLogout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        // 加载活动列表
+        async function loadEvents() {
+            try {
+                const response = await fetch(`${API_BASE}/events/list?limit=100`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    renderEvents(result.data || []);
+                } else {
+                    alert('加载失败：' + (result.msg || '未知错误'));
+                }
+            } catch (err) {
+                console.error('加载失败:', err);
+                alert('网络错误，请检查后端服务');
+            }
+        }
+
+        // 渲染活动列表
+        function renderEvents(events) {
+            const tbody = document.getElementById('eventsList');
+
+            if (events.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 60px; color: #999;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+                            <div>暂无活动数据</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = events.map(e => `
+                <tr>
+                    <td><strong>${e.title}</strong></td>
+                    <td>${e.time}</td>
+                    <td>${e.location}</td>
+                    <td>${e.apply_count}/${e.sign_count}</td>
+                    <td>${e.sign_rate}</td>
+                    <td>
+                        <span class="status-badge ${e.status === 'active' ? 'status-active' : 'status-ended'}">
+                            ${e.status === 'active' ? '进行中' : '已结束'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary" style="padding: 4px 8px; margin-right: 4px;"
+                                onclick="editEvent('${e.event_id}')">编辑</button>
+                        <button class="btn btn-danger" style="padding: 4px 8px;"
+                                onclick="deleteEvent('${e.event_id}')">删除</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 打开创建模态框
+        function openCreateModal() {
+            editingId = null;
+            document.getElementById('modalTitle').textContent = '新建活动';
+            document.getElementById('eventId').value = '';
+            document.getElementById('eventIdInput').value = 'event_' + Date.now();
+            document.getElementById('eventTitle').value = '';
+
+            // 设置默认时间为当前时间+1小时
+            const now = new Date();
+            now.setHours(now.getHours() + 1);
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const hour = now.getHours().toString().padStart(2, '0');
+            const minute = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('eventTime').value = `${year}-${month}-${day}T${hour}:${minute}`;
+
+            document.getElementById('eventLocation').value = '';
+            document.getElementById('eventDescription').value = '';
+            document.getElementById('eventModal').classList.add('active');
+        }
+
+        // 编辑活动
+        async function editEvent(eventId) {
+            try {
+                const response = await fetch(`${API_BASE}/events/detail/${eventId}`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    const event = result.data;
+                    editingId = eventId;
+
+                    document.getElementById('modalTitle').textContent = '编辑活动';
+                    document.getElementById('eventId').value = event.event_id;
+                    document.getElementById('eventIdInput').value = event.event_id;
+                    document.getElementById('eventIdInput').disabled = true;
+                    document.getElementById('eventTitle').value = event.title;
+                    document.getElementById('eventTime').value = event.time.replace(' ', 'T');
+                    document.getElementById('eventLocation').value = event.location;
+                    document.getElementById('eventDescription').value = event.description || '';
+                    document.getElementById('eventModal').classList.add('active');
+                } else {
+                    alert('获取活动信息失败');
+                }
+            } catch (err) {
+                console.error('获取活动详情失败:', err);
+                alert('网络错误');
+            }
+        }
+
+        // 保存活动
+        async function saveEvent() {
+            const eventData = {
+                event_id: document.getElementById('eventIdInput').value.trim(),
+                title: document.getElementById('eventTitle').value.trim(),
+                time: document.getElementById('eventTime').value.replace('T', ' '),
+                location: document.getElementById('eventLocation').value.trim(),
+                description: document.getElementById('eventDescription').value.trim()
+            };
+
+            // 验证
+            if (!eventData.event_id) {
+                alert('请输入活动ID');
+                return;
+            }
+            if (!eventData.title) {
+                alert('请输入活动名称');
+                return;
+            }
+            if (!eventData.time) {
+                alert('请选择活动时间');
+                return;
+            }
+            if (!eventData.location) {
+                alert('请输入活动地点');
+                return;
+            }
+
+            // 验证活动ID格式
+            if (!/^[a-zA-Z0-9_-]+$/.test(eventData.event_id)) {
+                alert('活动ID只能包含字母、数字、下划线和短横线');
+                return;
+            }
+
+            try {
+                const url = editingId ?
+                    `${API_BASE}/events/update/${editingId}` :
+                    `${API_BASE}/events/create`;
+
+                const response = await fetch(url, {
+                    method: editingId ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(eventData)
+                });
+
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    alert(editingId ? '更新成功' : '创建成功');
+                    closeModal();
+                    loadEvents();
+                } else {
+                    alert(result.msg || '操作失败');
+                }
+            } catch (err) {
+                console.error('保存失败:', err);
+                alert('网络错误');
+            }
+        }
+
+        // 删除活动
+        async function deleteEvent(eventId) {
+            if (!confirm('确定要删除这个活动吗？')) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/events/delete/${eventId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    alert('删除成功');
+                    loadEvents();
+                } else {
+                    alert(result.msg || '删除失败');
+                }
+            } catch (err) {
+                console.error('删除失败:', err);
+                alert('网络错误');
+            }
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('eventModal').classList.remove('active');
+            document.getElementById('eventIdInput').disabled = false;
+        }
+
+        // 搜索
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('#eventsList tr');
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(keyword) ? '' : 'none';
+            });
+        });
+
+        // 初始化
+        if (checkAuth()) {
+            loadEvents();
+            // 每30秒刷新
+            setInterval(loadEvents, 30000);
+        }
+    </script>
+</body>
+</html>

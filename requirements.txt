@@ -1,0 +1,30 @@
+# EventCast-MQTT Python 依赖包
+# 后端核心依赖
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# 数据库
+pymongo==4.6.0
+motor==3.7.1
+
+# MQTT客户端
+paho-mqtt==1.6.1
+
+# 数据处理
+pandas==2.1.3
+openpyxl==3.1.2
+
+# 加密与安全
+cryptography==41.0.7
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# 工具类
+python-dotenv==1.0.0
+requests==2.31.0
+python-multipart==0.0.6
+
+# 开发依赖（可选）
+pytest==7.4.3
+pytest-asyncio==0.21.1

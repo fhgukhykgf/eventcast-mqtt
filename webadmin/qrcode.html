@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成签到二维码 - 活动快传</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+        .header { background: #1890ff; color: white; padding: 16px 24px; }
+        .nav { display: flex; gap: 32px; margin-top: 16px; }
+        .nav a { color: white; text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; }
+        .nav a.active { border-bottom-color: white; }
+        .container { max-width: 800px; margin: 24px auto; padding: 0 24px; }
+        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+        .title { font-size: 24px; font-weight: 600; margin-bottom: 20px; color: #333; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; color: #666; font-weight: 500; }
+        .form-select { width: 100%; padding: 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 16px; }
+        .form-select:focus { outline: none; border-color: #1890ff; }
+        .btn { padding: 12px 24px; border-radius: 6px; border: none; cursor: pointer; font-size: 16px; font-weight: 500; transition: all 0.3s; }
+        .btn-primary { background: #1890ff; color: white; }
+        .btn-primary:hover { background: #40a9ff; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(24,144,255,0.3); }
+        .btn-primary:disabled { background: #d9d9d9; cursor: not-allowed; transform: none; box-shadow: none; }
+        .qrcode-container { text-align: center; margin: 30px 0; padding: 30px; background: #fafafa; border-radius: 8px; }
+        #qrcode { display: inline-block; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .qrcode-info { margin-top: 20px; font-size: 14px; color: #666; }
+        .qrcode-tip { color: #ff4d4f; font-size: 14px; margin-top: 10px; }
+        .event-info { background: #f0f5ff; padding: 15px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #1890ff; }
+        .event-info p { margin: 5px 0; color: #333; }
+        .event-info strong { color: #1890ff; }
+        .refresh-btn { margin-top: 20px; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #f0f0f0; border-top-color: #1890ff; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-message { color: #ff4d4f; background: #fff1f0; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div style="font-size: 20px; font-weight: 600; margin-bottom: 16px;">🎯 活动快传 · 管理后台</div>
+        <div class="nav">
+            <a href="dashboard.html">数据看板</a>
+            <a href="events.html">活动管理</a>
+            <a href="stats.html" class="active">详细统计</a>
+            <a href="qrcode.html" class="active">签到二维码</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <div class="title">📱 生成签到二维码</div>
+
+            <div class="form-group">
+                <label class="form-label">选择活动</label>
+                <select class="form-select" id="eventSelect" onchange="loadEventInfo()">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+
+            <div id="eventInfo" class="event-info" style="display: none;"></div>
+
+            <div id="errorMsg" class="error-message" style="display: none;"></div>
+
+            <div class="qrcode-container">
+                <div id="qrcode"></div>
+                <div class="qrcode-info" id="qrcodeInfo">
+                    <p>请选择活动生成二维码</p>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <button class="btn btn-primary" onclick="generateQRCode()" id="generateBtn" disabled>生成二维码</button>
+                <button class="btn btn-primary" onclick="refreshQRCode()" id="refreshBtn" style="display: none; margin-left: 10px;">刷新二维码</button>
+                <button class="btn btn-primary" onclick="downloadQRCode()" id="downloadBtn" style="display: none; margin-left: 10px;">下载二维码</button>
+            </div>
+
+            <div class="qrcode-tip" id="tip">
+                * 二维码有效期30分钟，过期请刷新
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.64:8000/api';  // 修改为你的服务器IP
+        let currentEvent = null;
+        let qrInterval = null;
+        let currentQRCanvas = null;
+
+        // 检查登录
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            const user = localStorage.getItem('admin_user');
+
+            if (!token || !user) {
+                window.location.href = 'index.html';
+                return false;
+            }
+            return true;
+        }
+
+        // 加载活动列表
+        async function loadEvents() {
+            const select = document.getElementById('eventSelect');
+
+            try {
+                console.log('📡 加载活动列表...');
+                const response = await fetch(`${API_BASE}/events/list?status=active&limit=100`);
+                const result = await response.json();
+
+                console.log('📥 活动列表响应:', result);
+
+                if (result.code === 200) {
+                    const events = result.data || [];
+
+                    if (events.length === 0) {
+                        select.innerHTML = '<option value="">暂无进行中的活动</option>';
+                        document.getElementById('generateBtn').disabled = true;
+                        showError('没有进行中的活动，请先在活动管理创建活动');
+                    } else {
+                        let options = '<option value="">请选择活动</option>';
+                        events.forEach(event => {
+                            options += `<option value="${event.event_id}">${event.title} (${event.time})</option>`;
+                        });
+                        select.innerHTML = options;
+                    }
+                } else {
+                    select.innerHTML = '<option value="">加载失败</option>';
+                    showError('加载活动列表失败：' + (result.msg || '未知错误'));
+                }
+            } catch (err) {
+                console.error('❌ 加载活动失败:', err);
+                select.innerHTML = '<option value="">网络错误</option>';
+                showError('网络错误，请检查后端服务是否运行');
+            }
+        }
+
+        // 显示错误
+        function showError(msg) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.style.display = 'block';
+            errorDiv.innerHTML = `❌ ${msg}`;
+        }
+
+        // 隐藏错误
+        function hideError() {
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+
+        // 加载活动信息
+        async function loadEventInfo() {
+            const eventId = document.getElementById('eventSelect').value;
+            hideError();
+
+            if (!eventId) {
+                document.getElementById('eventInfo').style.display = 'none';
+                document.getElementById('generateBtn').disabled = true;
+                return;
+            }
+
+            try {
+                console.log('📡 加载活动详情:', eventId);
+                const response = await fetch(`${API_BASE}/events/detail/${eventId}`);
+                const result = await response.json();
+
+                console.log('📥 活动详情:', result);
+
+                if (result.code === 200) {
+                    currentEvent = result.data;
+
+                    document.getElementById('eventInfo').style.display = 'block';
+                    document.getElementById('eventInfo').innerHTML = `
+                        <p><strong>📌 活动名称：</strong>${currentEvent.title}</p>
+                        <p><strong>⏰ 活动时间：</strong>${currentEvent.time}</p>
+                        <p><strong>📍 活动地点：</strong>${currentEvent.location}</p>
+                        <p><strong>📊 报名/签到：</strong>${currentEvent.apply_count || 0} / ${currentEvent.sign_count || 0} 人</p>
+                        <p><strong>📈 签到率：</strong>${currentEvent.sign_rate || '0%'}</p>
+                    `;
+
+                    document.getElementById('generateBtn').disabled = false;
+                } else {
+                    showError('获取活动详情失败：' + (result.msg || '未知错误'));
+                }
+
+            } catch (err) {
+                console.error('❌ 加载活动信息失败:', err);
+                showError('网络错误，请稍后重试');
+            }
+        }
+
+        // 生成二维码
+        function generateQRCode() {
+            if (!currentEvent) return;
+
+            hideError();
+
+            // 生成二维码内容（JSON格式）
+            const timestamp = Date.now();
+            const validUntil = timestamp + 30 * 60 * 1000; // 30分钟有效
+
+            const qrData = {
+                type: 'event_sign',
+                event_id: currentEvent.event_id,
+                event_title: currentEvent.title,
+                timestamp: timestamp,
+                valid_until: validUntil
+            };
+
+            const qrString = JSON.stringify(qrData);
+            console.log('📊 二维码数据:', qrData);
+
+            // 清空之前的二维码
+            document.getElementById('qrcode').innerHTML = '';
+
+            // 生成新二维码
+            QRCode.toCanvas(document.createElement('canvas'), qrString, {
+                width: 250,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#ffffff'
+                }
+            }, function(err, canvas) {
+                if (err) {
+                    console.error('❌ 二维码生成失败:', err);
+                    showError('二维码生成失败');
+                    return;
+                }
+
+                currentQRCanvas = canvas;
+                document.getElementById('qrcode').appendChild(canvas);
+
+                // 显示二维码信息
+                const validTime = new Date(validUntil).toLocaleTimeString();
+                document.getElementById('qrcodeInfo').innerHTML = `
+                    <p>✅ 二维码已生成</p>
+                    <p>活动：${currentEvent.title}</p>
+                    <p>有效期至：${validTime}</p>
+                    <p style="font-size: 12px; color: #999;">扫码后自动跳转到签到页</p>
+                `;
+
+                document.getElementById('generateBtn').style.display = 'none';
+                document.getElementById('refreshBtn').style.display = 'inline-block';
+                document.getElementById('downloadBtn').style.display = 'inline-block';
+
+                // 设置定时刷新提醒
+                startRefreshTimer();
+            });
+        }
+
+        // 刷新二维码
+        function refreshQRCode() {
+            if (qrInterval) {
+                clearTimeout(qrInterval);
+            }
+            generateQRCode();
+        }
+
+        // 下载二维码
+        function downloadQRCode() {
+            if (!currentQRCanvas) return;
+
+            // 创建下载链接
+            const link = document.createElement('a');
+            link.download = `${currentEvent.title}_签到码.png`;
+            link.href = currentQRCanvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // 启动刷新定时器（27分钟后提醒）
+        function startRefreshTimer() {
+            if (qrInterval) {
+                clearTimeout(qrInterval);
+            }
+
+            qrInterval = setTimeout(() => {
+                alert('⚠️ 二维码即将过期，请及时刷新');
+                document.getElementById('refreshBtn').style.backgroundColor = '#ff4d4f';
+                document.getElementById('refreshBtn').style.color = 'white';
+            }, 27 * 60 * 1000);
+        }
+
+        // 测试API连接
+        async function testConnection() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                console.log('✅ API连接正常:', data);
+                return true;
+            } catch (err) {
+                console.error('❌ API连接失败:', err);
+                showError('无法连接到后端服务，请检查服务器是否运行');
+                return false;
+            }
+        }
+
+        // 初始化
+        async function init() {
+            if (!checkAuth()) return;
+
+            // 先测试连接
+            const connected = await testConnection();
+            if (connected) {
+                loadEvents();
+            }
+        }
+
+        init();
+
+        // 清理定时器
+        window.onbeforeunload = function() {
+            if (qrInterval) {
+                clearTimeout(qrInterval);
+            }
+        };
+    </script>
+</body>
+</html>

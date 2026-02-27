@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据看板 · 活动快传</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName"></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav">
+            <a href="dashboard.html" class="active">数据看板</a>
+            <a href="events.html">活动管理</a>
+            <a href="stats.html">详细统计</a>
+            <a href="qrcode.html">签到二维码</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="stats-grid" id="statsCards">
+            <div class="stat-card">
+                <div class="stat-label">总活动数</div>
+                <div class="stat-value" id="totalEvents">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总报名人数</div>
+                <div class="stat-value" id="totalApply">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总签到人数</div>
+                <div class="stat-value" id="totalSign">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">平均签到率</div>
+                <div class="stat-value" id="avgRate">0%</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="card-header">
+                <div class="card-title">📊 近7天活动趋势</div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <div class="card-header">
+                <div class="card-title">🥧 活动分类统计</div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📋 最近活动</div>
+                <button class="btn btn-primary" onclick="location.href='events.html'">查看全部</button>
+            </div>
+            <div id="recentEvents"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://192.168.1.64:8000/api';
+
+        // 检查登录状态
+        function checkAuth() {
+            const token = localStorage.getItem('admin_token');
+            const user = localStorage.getItem('admin_user');
+
+            if (!token || !user) {
+                window.location.href = 'index.html';
+                return false;
+            }
+
+            document.getElementById('userName').textContent = JSON.parse(user).real_name || '管理员';
+            return true;
+        }
+
+        // 退出登录
+        function handleLogout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+
+        // 加载数据
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_BASE}/events/list?limit=100`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    const events = result.data || [];
+                    renderStats(events);
+                    renderRecentEvents(events);
+                    drawTrendChart(events);
+                    drawCategoryChart(events);
+                } else {
+                    showError('加载失败：' + (result.msg || '未知错误'));
+                }
+            } catch (err) {
+                console.error('加载失败:', err);
+                showError('网络错误，请检查后端服务');
+            }
+        }
+
+        // 渲染统计卡片
+        function renderStats(events) {
+            const totalEvents = events.length;
+            let totalApply = 0, totalSign = 0;
+
+            events.forEach(e => {
+                totalApply += e.apply_count || 0;
+                totalSign += e.sign_count || 0;
+            });
+
+            const avgRate = totalApply ? Math.round(totalSign / totalApply * 100) : 0;
+
+            document.getElementById('totalEvents').textContent = totalEvents;
+            document.getElementById('totalApply').textContent = totalApply;
+            document.getElementById('totalSign').textContent = totalSign;
+            document.getElementById('avgRate').textContent = avgRate + '%';
+        }
+
+        // 渲染最近活动
+        function renderRecentEvents(events) {
+            const recent = events.slice(0, 5);
+
+            if (recent.length === 0) {
+                document.getElementById('recentEvents').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">📭</div>
+                        <div>暂无活动数据</div>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = recent.map(e => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0;">
+                    <div>
+                        <div style="font-weight: 500;">${e.title}</div>
+                        <div style="font-size: 12px; color: #999;">${e.time} · ${e.location}</div>
+                    </div>
+                    <div style="display: flex; gap: 20px;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 12px; color: #999;">报名</div>
+                            <div style="font-weight: 600; color: #1890ff;">${e.apply_count}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 12px; color: #999;">签到</div>
+                            <div style="font-weight: 600; color: #52c41a;">${e.sign_count}</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 12px; color: #999;">签到率</div>
+                            <div style="font-weight: 600; color: #faad14;">${e.sign_rate}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('recentEvents').innerHTML = html;
+        }
+
+        // 绘制趋势图
+        function drawTrendChart(events) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+
+            // 生成最近7天的日期
+            const dates = [];
+            const counts = [];
+
+            for (let i = 6; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                dates.push(`${d.getMonth()+1}/${d.getDate()}`);
+                counts.push(0);
+            }
+
+            // 统计每天的活动数
+            events.forEach(e => {
+                try {
+                    const eventDate = new Date(e.time);
+                    const today = new Date();
+                    const diffDays = Math.floor((today - eventDate) / (24*60*60*1000));
+                    if (diffDays >= 0 && diffDays < 7) {
+                        counts[6 - diffDays]++;
+                    }
+                } catch (err) {
+                    console.warn('日期解析失败:', e.time);
+                }
+            });
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: '活动数量',
+                        data: counts,
+                        borderColor: '#1890ff',
+                        backgroundColor: 'rgba(24,144,255,0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#1890ff',
+                        pointBorderColor: 'white',
+                        pointBorderWidth: 2,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.05)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 绘制分类图
+        function drawCategoryChart(events) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+
+            // 统计分类
+            const categories = {
+                'lecture': 0,
+                'recruitment': 0,
+                'sports': 0,
+                'other': 0
+            };
+
+            events.forEach(e => {
+                const cat = e.category || 'other';
+                if (categories.hasOwnProperty(cat)) {
+                    categories[cat]++;
+                } else {
+                    categories.other++;
+                }
+            });
+
+            // 分类名称映射
+            const categoryNames = {
+                'lecture': '讲座',
+                'recruitment': '招新',
+                'sports': '体育',
+                'other': '其他'
+            };
+
+            const data = Object.keys(categories)
+                .filter(key => categories[key] > 0)
+                .map(key => ({
+                    name: categoryNames[key] || key,
+                    value: categories[key]
+                }));
+
+            if (data.length === 0) {
+                data.push({ name: '暂无数据', value: 1 });
+            }
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        data: data.map(d => d.value),
+                        backgroundColor: [
+                            '#1890ff',
+                            '#52c41a',
+                            '#faad14',
+                            '#ff4d4f',
+                            '#722ed1',
+                            '#13c2c2'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
+
+        // 显示错误
+        function showError(message) {
+            const container = document.querySelector('.container');
+            container.innerHTML = `
+                <div style="text-align: center; padding: 100px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">😵</div>
+                    <h3 style="color: #ff4d4f; margin-bottom: 16px;">加载失败</h3>
+                    <p style="color: #666; margin-bottom: 24px;">${message}</p>
+                    <button class="btn btn-primary" onclick="location.reload()">重新加载</button>
+                </div>
+            `;
+        }
+
+        // 初始化
+        if (checkAuth()) {
+            loadDashboard();
+            // 每30秒刷新
+            setInterval(loadDashboard, 30000);
+        }
+    </script>
+</body>
+</html>

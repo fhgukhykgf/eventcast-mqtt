@@ -1,0 +1,38 @@
+<view class="page">
+  <!-- 用户信息 -->
+  <view class="user-card">
+    <image class="avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}"></image>
+    <text class="user-name">{{userInfo.real_name || userInfo.user_name}}</text>
+    <text class="user-id">{{userInfo.user_id}}</text>
+  </view>
+
+  <!-- 统计卡片 -->
+  <view class="stats-card">
+    <view class="stat-item">
+      <text class="stat-value">{{stats.applyCount}}</text>
+      <text class="stat-label">报名活动</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value">{{stats.signCount}}</text>
+      <text class="stat-label">已签到</text>
+    </view>
+    <view class="stat-item">
+      <text class="stat-value">{{stats.signRate}}</text>
+      <text class="stat-label">签到率</text>
+    </view>
+  </view>
+
+  <!-- 功能菜单 -->
+  <view class="menu-list">
+    <block wx:for="{{menuList}}" wx:key="id">
+      <view class="menu-item" data-url="{{item.url}}" bindtap="onMenuTap">
+        <text class="menu-icon">{{item.icon}}</text>
+        <text class="menu-title">{{item.title}}</text>
+        <text class="menu-arrow">›</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 退出登录 -->
+  <button class="logout-btn" bindtap="onLogout">退出登录</button>
+</view>

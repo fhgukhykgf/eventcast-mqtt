@@ -1,0 +1,130 @@
+<view class="page">
+  <view class="header">
+    <image class="logo" src="/images/logo.png"></image>
+    <text class="title">活动快传</text>
+    <text class="slogan">校园活动管理专家</text>
+  </view>
+
+  <view class="form-container">
+    <!-- 切换标签 -->
+    <view class="tab-bar">
+      <view class="tab {{isLogin ? 'active' : ''}}" bindtap="switchMode">登录</view>
+      <view class="tab {{!isLogin ? 'active' : ''}}" bindtap="switchMode">注册</view>
+    </view>
+
+    <!-- 登录表单 -->
+    <view wx:if="{{isLogin}}">
+      <view class="form-group">
+        <input class="form-input {{errors.identifier ? 'error' : ''}}"
+               placeholder="学号/用户名"
+               value="{{loginForm.identifier}}"
+               data-field="identifier"
+               bindinput="onLoginInput" />
+        <text class="error-text" wx:if="{{errors.identifier}}">{{errors.identifier}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input {{errors.password ? 'error' : ''}}"
+               type="password"
+               placeholder="密码"
+               value="{{loginForm.password}}"
+               data-field="password"
+               bindinput="onLoginInput" />
+        <text class="error-text" wx:if="{{errors.password}}">{{errors.password}}</text>
+      </view>
+
+      <button class="btn btn-primary"
+              bindtap="onLogin"
+              disabled="{{loading}}"
+              loading="{{loading}}">
+        {{loading ? '登录中...' : '登录'}}
+      </button>
+    </view>
+
+    <!-- 注册表单 -->
+    <view wx:else>
+      <view class="form-group">
+        <input class="form-input {{errors.user_id ? 'error' : ''}}"
+               placeholder="学号/工号"
+               value="{{registerForm.user_id}}"
+               data-field="user_id"
+               bindinput="onRegisterInput" />
+        <text class="error-text" wx:if="{{errors.user_id}}">{{errors.user_id}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input {{errors.username ? 'error' : ''}}"
+               placeholder="用户名"
+               value="{{registerForm.username}}"
+               data-field="username"
+               bindinput="onRegisterInput" />
+        <text class="error-text" wx:if="{{errors.username}}">{{errors.username}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input {{errors.real_name ? 'error' : ''}}"
+               placeholder="真实姓名"
+               value="{{registerForm.real_name}}"
+               data-field="real_name"
+               bindinput="onRegisterInput" />
+        <text class="error-text" wx:if="{{errors.real_name}}">{{errors.real_name}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input {{errors.password ? 'error' : ''}}"
+               type="password"
+               placeholder="密码"
+               value="{{registerForm.password}}"
+               data-field="password"
+               bindinput="onRegisterInput" />
+        <text class="error-text" wx:if="{{errors.password}}">{{errors.password}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input {{errors.confirmPassword ? 'error' : ''}}"
+               type="password"
+               placeholder="确认密码"
+               value="{{registerForm.confirmPassword}}"
+               data-field="confirmPassword"
+               bindinput="onRegisterInput" />
+        <text class="error-text" wx:if="{{errors.confirmPassword}}">{{errors.confirmPassword}}</text>
+      </view>
+
+      <view class="form-group">
+        <input class="form-input"
+               placeholder="邮箱（选填）"
+               value="{{registerForm.email}}"
+               data-field="email"
+               bindinput="onRegisterInput" />
+      </view>
+
+      <view class="form-group">
+        <input class="form-input"
+               placeholder="手机号（选填）"
+               value="{{registerForm.phone}}"
+               data-field="phone"
+               bindinput="onRegisterInput" />
+      </view>
+
+      <view class="agreement">
+        <checkbox checked="{{agreeProtocol}}" bindchange="onAgreeChange" />
+        <text>我已阅读并同意 <text class="link">《用户协议》</text></text>
+      </view>
+
+      <button class="btn btn-primary"
+              bindtap="onRegister"
+              disabled="{{loading}}"
+              loading="{{loading}}">
+        {{loading ? '注册中...' : '注册'}}
+      </button>
+    </view>
+
+    <!-- 其他登录方式 -->
+    <view class="other-login">
+      <text class="divider">其他方式</text>
+      <view class="other-buttons">
+        <button class="other-btn" bindtap="onGuestLogin">游客访问</button>
+      </view>
+    </view>
+  </view>
+</view>

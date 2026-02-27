@@ -1,0 +1,135 @@
+<!-- pages/event-detail/event-detail.wxml -->
+<view class="page">
+  <!-- 加载中 -->
+  <view class="loading-mask" wx:if="{{loading}}">
+    <view class="loading"></view>
+    <text>加载中...</text>
+  </view>
+
+  <view wx:else>
+    <!-- 活动信息卡片 -->
+    <view class="card">
+      <!-- 修复：不使用可选链，用三元表达式 -->
+      <text class="title">{{event ? event.title : '活动标题'}}</text>
+
+      <view class="info-item">
+        <text class="label">⏰ 活动时间</text>
+        <!-- 修复：event && event.time 形式 -->
+        <text class="value">{{event && event.time ? formatTime(event.time) : '时间待定'}}</text>
+      </view>
+
+      <view class="info-item">
+        <text class="label">📍 活动地点</text>
+        <text class="value">{{event && event.location ? event.location : '未知地点'}}</text>
+      </view>
+
+      <!-- 修复：不使用可选链，用 && 判断 -->
+      <view class="info-item" wx:if="{{event && event.organizer}}">
+        <text class="label">👥 组织者</text>
+        <text class="value">{{event.organizer}}</text>
+      </view>
+
+      <!-- 统计信息 -->
+      <view class="stats">
+        <view class="stat-item">
+          <text class="stat-value">{{event ? event.apply_count || 0 : 0}}</text>
+          <text class="stat-label">报名</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-value">{{event ? event.sign_count || 0 : 0}}</text>
+          <text class="stat-label">签到</text>
+        </view>
+        <view class="stat-item">
+          <text class="stat-value">{{event ? event.sign_rate || '0%' : '0%'}}</text>
+          <text class="stat-label">签到率</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 活动描述 -->
+    <view class="card" wx:if="{{event && event.description}}">
+      <text class="section-title">📝 活动介绍</text>
+      <text class="description">{{event.description}}</text>
+    </view>
+
+    <!-- 我的状态 -->
+    <!-- 在“我的状态”卡片中修改时间显示 -->
+<view class="card" wx:if="{{userInfo}}">
+  <text class="section-title">👤 我的状态</text>
+  <view class="status-item">
+    <text class="status-label">报名状态</text>
+    <text class="status-value {{userStatus.hasApplied ? 'applied' : ''}}">
+      {{userStatus.hasApplied ? '✅ 已报名' : '❌ 未报名'}}
+    </text>
+  </view>
+
+  <!-- 显示报名时间（如果有） -->
+  <view class="status-time" wx:if="{{userStatus.hasApplied && userStatus.applyTime}}">
+    报名时间: {{formatTime(userStatus.applyTime)}}
+  </view>
+
+  <view class="status-item" wx:if="{{userStatus.hasApplied}}">
+    <text class="status-label">签到状态</text>
+    <text class="status-value {{userStatus.hasSigned ? 'signed' : ''}}">
+      {{userStatus.hasSigned ? '✅ 已签到' : '⏳ 待签到'}}
+    </text>
+  </view>
+
+  <!-- 显示签到时间（如果有） -->
+  <view class="status-time" wx:if="{{userStatus.hasSigned && userStatus.signTime}}">
+    签到时间: {{formatTime(userStatus.signTime)}}
+  </view>
+
+  <!-- 如果没有时间数据，显示提示 -->
+  <view class="status-time" wx:elif="{{userStatus.hasApplied && !userStatus.applyTime}}">
+    报名时间: 正在加载...
+  </view>
+</view>
+
+    <!-- 操作按钮 -->
+   <!-- 在操作按钮区域使用 getButtonState -->
+<view class="action-bar">
+  <!-- 立即报名 -->
+  <button class="btn btn-primary"
+          wx:if="{{getButtonState().type === 'apply'}}"
+          bindtap="onApply">
+    {{getButtonState().text}}
+  </button>
+
+  <!-- 取消报名 -->
+  <button class="btn btn-warning"
+          wx:if="{{getButtonState().type === 'cancel'}}"
+          bindtap="onCancelApply">
+    {{getButtonState().text}}
+  </button>
+
+  <!-- 扫码签到 -->
+  <button class="btn btn-success"
+          wx:if="{{getButtonState().type === 'sign'}}"
+          bindtap="onSign">
+    {{getButtonState().text}}
+  </button>
+
+  <!-- 已签到 -->
+  <button class="btn btn-disabled"
+          wx:if="{{getButtonState().type === 'signed'}}"
+          disabled="true">
+    {{getButtonState().text}}
+  </button>
+
+  <!-- 活动已结束 -->
+  <button class="btn btn-disabled"
+          wx:if="{{getButtonState().type === 'ended'}}"
+          disabled="true">
+    {{getButtonState().text}}
+  </button>
+
+  <!-- 管理员删除按钮 -->
+  <button class="btn btn-danger"
+          wx:if="{{canManage}}"
+          bindtap="onDelete">
+    🗑️ 删除活动
+  </button>
+</view>
+  </view>
+</view>

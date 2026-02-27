@@ -1,0 +1,141 @@
+/* pages/events/events.wxss */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.filter-bar {
+  display: flex;
+  background: white;
+  padding: 20rpx 30rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.filter-item {
+  margin-right: 40rpx;
+  padding: 8rpx 0;
+  font-size: 28rpx;
+  color: #666;
+  position: relative;
+}
+
+.filter-item.active {
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.filter-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4rpx;
+  background: #1890ff;
+  border-radius: 2rpx;
+}
+
+.event-list {
+  padding: 30rpx;
+}
+
+.event-card {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.event-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  margin-right: 20rpx;
+}
+
+.event-status {
+  padding: 4rpx 16rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  white-space: nowrap;
+}
+
+.status-active {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-upcoming {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.status-ended {
+  background: #f5f5f5;
+  color: #999;
+}
+
+.event-info {
+  margin-bottom: 20rpx;
+  font-size: 26rpx;
+  color: #666;
+}
+
+.event-time,
+.event-location {
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.event-footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 20rpx;
+  border-top: 2rpx solid #f0f0f0;
+  font-size: 24rpx;
+  color: #999;
+}
+
+.load-more {
+  text-align: center;
+  padding: 30rpx;
+  color: #999;
+  font-size: 26rpx;
+}
+
+.empty-state {
+  padding: 100rpx 30rpx;
+  text-align: center;
+}
+
+.empty-icon {
+  width: 200rpx;
+  height: 200rpx;
+  opacity: 0.4;
+  margin-bottom: 30rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #999;
+  margin-bottom: 40rpx;
+  display: block;
+}
+
+.empty-state .btn {
+  width: 300rpx;
+  height: 80rpx;
+  border-radius: 40rpx;
+}

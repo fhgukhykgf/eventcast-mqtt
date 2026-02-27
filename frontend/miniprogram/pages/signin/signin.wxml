@@ -1,0 +1,58 @@
+<!-- 签到页 -->
+<view class="page">
+  <!-- 成功弹窗 -->
+  <view class="success-modal" wx:if="{{showSuccess}}">
+    <view class="success-content">
+      <text class="success-icon">✅</text>
+      <text class="success-title">签到成功！</text>
+      <text class="success-time">签到时间: {{signResult.sign_time}}</text>
+    </view>
+  </view>
+
+  <!-- 扫码区域 -->
+  <view class="scan-area" bindtap="onScan">
+    <view class="scan-box">
+      <text class="scan-icon">📷</text>
+      <text>点击扫码签到</text>
+    </view>
+  </view>
+
+  <!-- 手动输入 -->
+  <view class="manual-input">
+    <text class="label">或手动输入活动ID</text>
+    <input class="input" placeholder="输入活动ID"
+           value="{{eventId}}" bindinput="onInputEventId" />
+  </view>
+
+  <!-- 活动信息 -->
+  <view class="event-info" wx:if="{{event}}">
+    <text class="event-title">{{event.title}}</text>
+    <text class="event-time">🕒 {{event.time}}</text>
+    <text class="event-location">📍 {{event.location}}</text>
+  </view>
+
+  <!-- 状态信息 -->
+  <view class="status-info" wx:if="{{event}}">
+    <view class="status-item">
+      <text>报名状态</text>
+      <text class="{{userStatus.hasApplied ? 'applied' : ''}}">
+        {{userStatus.hasApplied ? '已报名' : '未报名'}}
+      </text>
+    </view>
+    <view class="status-item">
+      <text>签到状态</text>
+      <text class="{{userStatus.hasSigned ? 'signed' : ''}}">
+        {{userStatus.hasSigned ? '已签到' : '未签到'}}
+      </text>
+    </view>
+  </view>
+
+  <!-- 签到按钮 -->
+  <button class="btn btn-primary sign-btn"
+          wx:if="{{canSign()}}"
+          bindtap="onSign"
+          disabled="{{signing}}"
+          loading="{{signing}}">
+    {{signing ? '签到中...' : '立即签到'}}
+  </button>
+</view>

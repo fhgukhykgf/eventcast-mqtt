@@ -1,0 +1,157 @@
+.page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 100rpx 40rpx;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 60rpx;
+  color: white;
+}
+
+.logo {
+  width: 120rpx;
+  height: 120rpx;
+  margin-bottom: 20rpx;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.slogan {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+.form-container {
+  width: 100%;
+  background: white;
+  border-radius: 24rpx;
+  padding: 40rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.2);
+}
+
+.tab-bar {
+  display: flex;
+  margin-bottom: 40rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  padding: 20rpx 0;
+  font-size: 32rpx;
+  color: #999;
+  position: relative;
+}
+
+.tab.active {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60rpx;
+  height: 4rpx;
+  background: #1890ff;
+  border-radius: 2rpx;
+}
+
+.form-group {
+  margin-bottom: 30rpx;
+}
+
+.form-input {
+  width: 100%;
+  height: 88rpx;
+  padding: 0 24rpx;
+  border: 2rpx solid #f0f0f0;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
+
+.form-input.error {
+  border-color: #ff4d4f;
+}
+
+.error-text {
+  font-size: 24rpx;
+  color: #ff4d4f;
+  margin-top: 8rpx;
+  display: block;
+}
+
+.agreement {
+  margin: 30rpx 0;
+  font-size: 26rpx;
+  color: #666;
+}
+
+.link {
+  color: #1890ff;
+}
+
+.other-login {
+  margin-top: 40rpx;
+  text-align: center;
+}
+
+.divider {
+  display: inline-block;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  color: #999;
+  background: white;
+  position: relative;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 60rpx;
+  height: 2rpx;
+  background: #f0f0f0;
+}
+
+.divider::before {
+  left: -60rpx;
+}
+
+.divider::after {
+  right: -60rpx;
+}
+
+.other-buttons {
+  margin-top: 30rpx;
+}
+
+.other-btn {
+  width: 200rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  background: #f5f5f5;
+  border-radius: 36rpx;
+  font-size: 26rpx;
+  color: #666;
+  border: none;
+}
+
+.other-btn::after {
+  border: none;
+}

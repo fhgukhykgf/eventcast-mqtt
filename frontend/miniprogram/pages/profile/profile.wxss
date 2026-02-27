@@ -1,0 +1,103 @@
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+}
+
+.user-card {
+  background: linear-gradient(135deg, #1890ff, #096dd9);
+  padding: 60rpx 30rpx;
+  text-align: center;
+  color: white;
+}
+
+.avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  border: 6rpx solid rgba(255,255,255,0.3);
+  margin-bottom: 20rpx;
+}
+
+.user-name {
+  font-size: 40rpx;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.user-id {
+  font-size: 28rpx;
+  opacity: 0.9;
+}
+
+.stats-card {
+  background: white;
+  margin: -40rpx 30rpx 30rpx;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  display: flex;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
+}
+
+.stat-item {
+  flex: 1;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #1890ff;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.menu-list {
+  background: white;
+  margin: 0 30rpx 30rpx;
+  border-radius: 16rpx;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 30rpx;
+  border-bottom: 2rpx solid #f0f0f0;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-icon {
+  width: 60rpx;
+  font-size: 40rpx;
+  margin-right: 20rpx;
+}
+
+.menu-title {
+  flex: 1;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.menu-arrow {
+  font-size: 40rpx;
+  color: #999;
+}
+
+.logout-btn {
+  margin: 30rpx;
+  background: #ff4d4f;
+  color: white;
+  border: none;
+}
+
+.logout-btn::after {
+  border: none;
+}
