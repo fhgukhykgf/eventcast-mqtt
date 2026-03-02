@@ -1,121 +1,116 @@
-# EventCast-MQTT · 活动快传
+## 中文简介
 
-🎯 **轻量化校园活动管理系统** - 解决活动管理中"通知漏、签到慢、统计繁"的核心痛点
+团队致力于开发一个轻量级的校园活动管理系统——**活动快传**。由于传统活动管理存在通知遗漏、签到缓慢、统计繁琐等痛点，我们选择基于高效的 MQTT 通信协议构建项目。目前已经实现了完整的小程序界面、Web管理后台以及后端逻辑。对于活动相关的实时通信，我们开发了基于 MQTT 的消息推送层，确保所有客户端能够即时收到更新。
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
-[![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb)](https://www.mongodb.com)
-[![EMQX](https://img.shields.io/badge/EMQX-009688?style=for-the-badge&logo=eclipse-mosquitto)](https://www.emqx.io)
-[![微信小程序](https://img.shields.io/badge/微信小程序-07C160?style=for-the-badge&logo=wechat)](https://developers.weixin.qq.com/miniprogram/dev/framework/)
+### 架构设计
 
----
+在这个项目中，我们采用经典的前后端分离方式，并结合 MQTT 实时消息架构。前端界面（微信小程序和 Web 管理端）在启动或页面展示时通过 RESTful API 从后端数据库获取数据。对于需要实时更新的操作——如新活动创建、用户签到或状态变更——我们利用 MQTT 进行即时推送。
 
-## 📋 项目简介
+架构包含三个主要组件：
 
-EventCast-MQTT 是一款面向校园活动的轻量化管理系统，专注于讲座、社团招新、小型运动会等场景，提供"简易通知+扫码签到+基础统计"一体化功能。
+- **后端 API (FastAPI)**：处理数据检索和操作的标准 RESTful 请求
+- **MQTT 代理 (EMQX)**：管理向订阅客户端分发的实时消息
+- **MQTT 客户端 (Python/paho-mqtt)**：集成在后端，用于发布事件消息
 
-### ✨ 核心功能
+这种设计确保所有用户无需轮询即可获得实时更新，显著降低服务器负载并提升响应速度。后端与 MQTT 代理之间的通信采用 MQTT 的发布/订阅模型，轻量且安全。
 
-| 模块 | 功能 | 说明 |
-|------|------|------|
-| **用户管理** | 登录/注册 | 支持学生、教师、组织者多角色 |
-| | 个人信息 | 查看个人资料和统计数据 |
-| **活动管理** | 创建活动 | 组织者可创建活动（Web端） |
-| | 活动列表 | 查看所有活动及状态 |
-| | 活动详情 | 查看活动详细信息 |
-| **签到系统** | 扫码签到 | 动态二维码，30秒刷新 |
-| | 报名功能 | 一键报名/取消报名 |
-| | 签到状态 | 实时查看签到状态 |
-| **数据统计** | 实时看板 | 报名人数、签到人数、签到率 |
-| | 数据导出 | Excel格式导出签到记录 |
-| **消息通知** | MQTT推送 | 基于MQTT的实时通知 |
+### 数据库
 
----
+我们设计了以下四个表来存储业务数据：
 
-## 🚀 快速开始
+1. **活动表**：存储活动的基本信息，如标题、时间、地点、组织者、人数限制等
+2. **用户表**：存储用户的登录信息、个人资料和角色权限
+3. **报名表**：记录用户对活动的报名情况
+4. **签到表**：记录用户的签到时间和方式
 
-### 环境要求
+### MQTT通信
 
-- Python 3.9+
-- MongoDB 5.0+
-- EMQ X 4.4+ (可选，用于MQTT通知)
-- Node.js 16+ (用于小程序开发)
+在物联网通信中，MQTT 是大部分人的首选。该协议采用发布/订阅模式，只有订阅了特定主题的客户端才能收到相应消息，所有通信都通过 MQTT 服务器进行中转，这提高了安全性和传输效率。基于此，我们将 MQTT 集成到活动管理系统中，为活动创建、签到和通知提供实时更新能力。
 
-### 一键部署
+我们的 MQTT 主题结构如下：
 
-```bash
-# 1. 克隆项目
-git clone https://github.com/your-repo/eventcast-mqtt.git
-cd eventcast-mqtt
+- `event/{event_id}/notice`：用于活动相关通知（创建、更新、提醒）
+- `event/{event_id}/sign_in`：用于实时签到数据同步
+- `system/broadcast`：用于系统级广播
 
-# 2. 安装依赖
-pip install -r requirements.txt
+当组织者创建新活动时，后端向相应主题发布消息，所有订阅的用户会立即收到通知。同样，当用户签到时，组织者的看板上的签到人数会实时更新。
 
-# 3. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，修改数据库连接等配置
+### 小程序设计
 
-# 4. 初始化数据库
-python scripts/init_database.py
-python scripts/create_admin.py
+我们为微信小程序设计了五个主要页面：
 
-# 5. 启动服务
-./run.sh
+- `首页`：展示即将开始的活动和快捷操作入口
+- `登录页`：用户认证（登录/注册）
+- `活动列表页`：浏览所有活动，支持筛选
+- `活动详情页`：查看特定活动的详细信息
+- `签到页`：二维码扫码和手动签到界面
+- `个人中心`：用户资料、统计数据和设置
 
-📁 目录结构
-eventcast-mqtt/
-├── backend/                          # 后端服务
-│   ├── main.py                       # 主程序入口
-│   ├── api/                          # API接口
-│   │   ├── events.py                  # 活动管理
-│   │   ├── signin.py                   # 签到管理
-│   │   └── users.py                    # 用户管理
-│   ├── models/                        # 数据模型
-│   │   ├── event.py                    # 活动模型
-│   │   ├── signin.py                   # 签到模型
-│   │   └── user.py                     # 用户模型
-│   └── utils/                         # 工具函数
-│       ├── database.py                 # 数据库连接
-│       └── mqtt_client.py              # MQTT客户端
-│
-├── frontend/                          # 微信小程序
-│   ├── pages/                          # 页面
-│   │   ├── index/                       # 首页
-│   │   ├── login/                       # 登录页
-│   │   ├── events/                      # 活动列表
-│   │   ├── event-detail/                # 活动详情
-│   │   ├── signin/                      # 签到页
-│   │   └── profile/                     # 个人中心
-│   ├── utils/                          # 工具函数
-│   └── app.js                          # 小程序入口
-│
-├── webadmin/                          # Web管理端
-│   ├── dashboard.html                   # 数据看板
-│   ├── events.html                       # 活动管理
-│   └── stats.html                        # 详细统计
-│
-├── scripts/                           # 运维脚本
-│   ├── init_database.py                 # 数据库初始化
-│   └── create_admin.py                  # 创建管理员
-│
-├── requirements.txt                   # Python依赖
-├── .env.example                       # 环境变量示例
-└── run.sh                             # 一键启动脚本
+### Web管理端设计
 
-🔧 配置说明
-环境变量 (.env)
-# MongoDB配置
-MONGODB_URI=mongodb://localhost:27017/eventcast
+针对组织者和管理员，我们提供了一个基于 Web 的管理后台，包含以下部分：
 
-# MQTT配置
-MQTT_BROKER=localhost
-MQTT_PORT=1883
-MQTT_USERNAME=admin
-MQTT_PASSWORD=public
+- `数据看板`：实时统计数据和图表（总活动数、签到数、趋势）
+- `活动管理`：创建、编辑、删除和查看所有活动
+- `详细统计`：深入分析签到模式和热门活动
+- `签到二维码`：为活动生成动态二维码
 
-# 后端配置
-BACKEND_HOST=0.0.0.0
-BACKEND_PORT=8000
-DEBUG=true
+## 快速开始
+
+1. 首先安装以下依赖
+
+   - [MongoDB](https://www.mongodb.com/) 作为项目数据库
+   - [EMQX](https://www.emqx.io/zh) 帮助我们搭建 MQTT 服务器
+   - [Python 3.9+](https://www.python.org/) 运行后端服务
+   - [微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html) 加载小程序项目
+
+2. 克隆我们的仓库或下载发布的代码
+
+   bash
+
+   ```
+   
+   git clone https://github.com/fhgukhykgf/eventcast-mqtt.git
+
+   ```
+   
+
+3. 安装 Python 依赖并配置环境
+
+   bash
+
+   ```
+   pip install -r requirements.txt
+   cp .env.example .env
+   # 编辑 .env 文件，配置数据库和 MQTT 连接信息
+   ```
+
+   
+
+4. 初始化数据库
+
+   bash
+
+   ```
+   python scripts/init_database.py
+   python scripts/create_admin.py
+   ```
+
+   
+
+5. 启动后端服务
+
+   bash
+
+   ```
+   cd backend
+   python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+   
+
+6. 使用微信开发者工具加载小程序项目（`/frontend` 目录），修改 `app.js` 中的 `baseUrl` 为你的服务器地址
+
+7. 通过浏览器访问 Web 管理端（需配置 Nginx 或直接打开 HTML 文件）
 
 Nginx配置 (Web管理端)
 # /etc/nginx/conf.d/eventcast.conf
@@ -126,7 +121,7 @@ server {
     location /admin {
         alias /path/to/eventcast-mqtt/webadmin;
         index dashboard.html;
-        try_files $uri $uri/ /admin/dashboard.html;
+        try_files $uri $uri/ /admin/index.html;
     }
     
     location /api {
@@ -135,21 +130,6 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
     }
 }
-📱 小程序使用
-开发环境配置
-打开微信开发者工具
-
-导入项目：/path/to/eventcast-mqtt/frontend
-
-修改 app.js 中的 baseUrl 为你的后端地址
-
-点击「编译」预览
-真机调试
-// app.js
-globalData: {
-    baseUrl: 'http://你的电脑IP:8000/api',  // 手机和电脑在同一WiFi
-    // ...
-}
 
 👥 默认账号
 角色	用户名	密码	说明
@@ -157,94 +137,17 @@ globalData: {
 学生	20230002	123456	普通用户
 组织者	O2023001	123456	可创建活动
 管理员	admin	admin123	系统管理
-📊 API概览
-用户相关
-方法	路径	说明
-POST	/api/users/register	用户注册
-POST	/api/users/login	用户登录
-GET	/api/users/info/{user_id}	获取用户信息
-GET	/api/users/statistics/{user_id}	获取用户统计
-活动相关
-方法	路径	说明
-POST	/api/events/create	创建活动
-GET	/api/events/list	获取活动列表
-GET	/api/events/detail/{event_id}	获取活动详情
-PUT	/api/events/update/{event_id}	更新活动
-DELETE	/api/events/delete/{event_id}	删除活动
-签到相关
-方法	路径	说明
-POST	/api/sign/apply	报名活动
-POST	/api/sign/cancel	取消报名
-POST	/api/sign/in	签到
-GET	/api/sign/status/{event_id}/{user_id}	获取签到状态
-GET	/api/sign/records/{event_id}	获取签到记录
-GET	/api/sign/count/{event_id}	获取签到计数
 
-🛠️ 运维管理
-健康检查
-bash
-# 检查服务状态
-curl http://localhost:8000/api/health
-查看日志
-bash
-# 后端日志
-tail -f backend/logs/app.log
 
-# MongoDB日志
-tail -f /var/log/mongodb/mongod.log
+## 许可证
 
-数据备份
-bash
-# 手动备份MongoDB
-mongodump --db eventcast --out ./backups/$(date +%Y%m%d)
+This project is licensed under the [MIT License](https://opensource.org/license/MIT) - see the [LICENSE](https://license/) file for details.
 
-❓ 常见问题
-1. 无法连接后端
-检查后端是否运行：ps aux | grep uvicorn
 
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-检查端口：netstat -tlnp | grep 8000
 
-检查防火墙：systemctl status firewalld
 
-2. 小程序预览失败
-确认 baseUrl 配置正确
 
-开发者工具中勾选「不校验合法域名」
 
-手机和电脑在同一网络
 
-3. 登录提示密码错误
-使用默认账号：20230001 / 123456
 
-重新初始化数据库：python scripts/init_database.py
 
-4. MQTT消息不推送
-检查EMQX服务：systemctl status emqx
-
-检查配置：.env 中的MQTT配置
-
-📄 许可证
-本项目采用 MIT 许可证，仅供学习交流使用。
-
-🤝 贡献指南
-Fork 项目
-
-创建功能分支 (git checkout -b feature/amazing)
-
-提交更改 (git commit -m 'feat: add amazing feature')
-
-推送到分支 (git push origin feature/amazing)
-
-创建 Pull Request
-
-📞 联系我们
-问题反馈：issues@eventcast.com
-
-技术支持：support@eventcast.com
-
-项目主页：https://github.com/your-repo/eventcast-mqtt
-
-⭐ 如果这个项目对你有帮助，欢迎 Star！
-
-text
