@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>活动管理 · 活动快传</title>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .detail-section {
+            margin-bottom: 16px;
+        }
+        .detail-row {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        .detail-label {
+            width: 80px;
+            flex-shrink: 0;
+            font-size: 13px;
+            color: #999;
+        }
+        .detail-value {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+        .detail-section > div:first-child {
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 <body>
     <div class="header">
@@ -15,17 +39,19 @@
                 <button class="logout-btn" onclick="handleLogout()">退出登录</button>
             </div>
         </div>
-        <div class="nav">
-            <a href="dashboard.html">数据看板</a>
-            <a href="events.html" class="active">活动管理</a>
-            <a href="stats.html">详细统计</a>
-            <a href="qrcode.html">签到二维码</a>
-        </div>
+        <div class="nav"></div>
     </div>
 
     <div class="container">
         <div class="toolbar">
             <input type="text" class="search-input" id="searchInput" placeholder="搜索活动名称或地点...">
+            <select class="form-select" id="statusFilter" onchange="filterEvents()" style="width: 120px;">
+                <option value="all">全部状态</option>
+                <option value="pending">未开始</option>
+                <option value="active">进行中</option>
+                <option value="ended">已结束</option>
+                <option value="cancelled">已取消</option>
+            </select>
             <button class="btn btn-primary" onclick="openCreateModal()">➕ 新建活动</button>
             <button class="btn btn-success" onclick="loadEvents()">🔄 刷新</button>
         </div>
@@ -34,13 +60,10 @@
             <table>
                 <thead>
                     <tr>
-                        <th>活动名称</th>
-                        <th>活动时间</th>
-                        <th>地点</th>
-                        <th>报名/签到</th>
-                        <th>签到率</th>
-                        <th>状态</th>
-                        <th>操作</th>
+                        <th style="width: 30%;">活动名称</th>
+                        <th style="width: 20%;">活动时间</th>
+                        <th style="width: 15%;">状态</th>
+                        <th style="width: 35%;">操作</th>
                     </tr>
                 </thead>
                 <tbody id="eventsList"></tbody>
@@ -67,13 +90,23 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">活动时间 <span style="color: #ff4d4f;">*</span></label>
-                <input type="datetime-local" class="form-input" id="eventTime">
+                <label class="form-label">活动开始时间 <span style="color: #ff4d4f;">*</span></label>
+                <input type="datetime-local" class="form-input" id="eventStartTime">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">活动结束时间 <span style="color: #ff4d4f;">*</span></label>
+                <input type="datetime-local" class="form-input" id="eventEndTime">
             </div>
 
             <div class="form-group">
                 <label class="form-label">活动地点 <span style="color: #ff4d4f;">*</span></label>
                 <input type="text" class="form-input" id="eventLocation" placeholder="请输入活动地点">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">组织者</label>
+                <input type="text" class="form-input" id="eventOrganizer" placeholder="请输入组织者名称">
             </div>
 
             <div class="form-group">
@@ -88,29 +121,26 @@
         </div>
     </div>
 
+    <!-- 活动详情弹窗 -->
+    <div class="modal" id="eventDetailModal">
+        <div class="modal-content" style="width: 560px;">
+            <div class="modal-title">📋 活动详情</div>
+            <div id="eventDetailContent" style="padding: 16px 0;">
+                <!-- 动态填充 -->
+            </div>
+            <div class="form-actions">
+                <button class="btn" onclick="closeDetailModal()">关闭</button>
+                <button class="btn btn-primary" id="editEventBtn" onclick="editCurrentEvent()">编辑</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="js/utils.js"></script>
     <script>
-        const API_BASE = 'http://192.168.1.64:8000/api';
+        const API_BASE = config.API_BASE;
         let editingId = null;
-
-        // 检查登录
-        function checkAuth() {
-            const token = localStorage.getItem('admin_token');
-            const user = localStorage.getItem('admin_user');
-
-            if (!token || !user) {
-                window.location.href = 'index.html';
-                return false;
-            }
-
-            document.getElementById('userName').textContent = JSON.parse(user).real_name || '管理员';
-            return true;
-        }
-
-        // 退出登录
-        function handleLogout() {
-            localStorage.clear();
-            window.location.href = 'index.html';
-        }
+        let allEvents = [];
 
         // 加载活动列表
         async function loadEvents() {
@@ -119,14 +149,57 @@
                 const result = await response.json();
 
                 if (result.code === 200) {
-                    renderEvents(result.data || []);
+                    allEvents = result.data || [];
+                    filterEvents();
                 } else {
-                    alert('加载失败：' + (result.msg || '未知错误'));
+                    Toast.error(result.msg || '加载失败');
                 }
             } catch (err) {
                 console.error('加载失败:', err);
-                alert('网络错误，请检查后端服务');
+                Toast.error('网络错误，请检查后端服务');
             }
+        }
+
+        // 筛选活动
+        function filterEvents() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
+            const now = new Date();
+
+            let filtered = allEvents;
+
+            // 按状态筛选
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(e => {
+                    const startTime = new Date((e.start_time || e.time).replace(' ', 'T'));
+                    const endTime = new Date((e.end_time || e.time).replace(' ', 'T'));
+                    const isCancelled = e.status === 'cancelled';
+                    const isPending = now < startTime;
+                    const isEnded = endTime < now;
+                    
+                    let computedStatus;
+                    if (isCancelled) {
+                        computedStatus = 'cancelled';
+                    } else if (isEnded) {
+                        computedStatus = 'ended';
+                    } else if (isPending) {
+                        computedStatus = 'pending';
+                    } else {
+                        computedStatus = 'active';
+                    }
+                    return computedStatus === statusFilter;
+                });
+            }
+
+            // 按关键词搜索
+            if (searchKeyword) {
+                filtered = filtered.filter(e => 
+                    (e.title && e.title.toLowerCase().includes(searchKeyword)) ||
+                    (e.location && e.location.toLowerCase().includes(searchKeyword))
+                );
+            }
+
+            renderEvents(filtered);
         }
 
         // 渲染活动列表
@@ -136,7 +209,7 @@
             if (events.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" style="text-align: center; padding: 60px; color: #999;">
+                        <td colspan="4" style="text-align: center; padding: 60px; color: #999;">
                             <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
                             <div>暂无活动数据</div>
                         </td>
@@ -145,26 +218,73 @@
                 return;
             }
 
-            tbody.innerHTML = events.map(e => `
-                <tr>
-                    <td><strong>${e.title}</strong></td>
-                    <td>${e.time}</td>
-                    <td>${e.location}</td>
-                    <td>${e.apply_count}/${e.sign_count}</td>
-                    <td>${e.sign_rate}</td>
+            // 按活动时间倒排序
+            events.sort((a, b) => {
+                const timeA = new Date((a.start_time || a.time).replace(' ', 'T'));
+                const timeB = new Date((b.start_time || b.time).replace(' ', 'T'));
+                return timeB - timeA;
+            });
+
+            // 检查活动状态，自动更新已结束的活动
+            const now = new Date();
+            
+            tbody.innerHTML = events.map(e => {
+                const startTime = new Date((e.start_time || e.time).replace(' ', 'T'));
+                const endTime = new Date((e.end_time || e.time).replace(' ', 'T'));
+                const isCancelled = e.status === 'cancelled';
+                const isPending = now < startTime;
+                const isEnded = endTime < now;
+                
+                let computedStatus;
+                if (isCancelled) {
+                    computedStatus = 'cancelled';
+                } else if (isEnded) {
+                    computedStatus = 'ended';
+                } else if (isPending) {
+                    computedStatus = 'pending';
+                } else {
+                    computedStatus = 'active';
+                }
+                
+                const canModify = isPending && !isCancelled;
+                
+                let statusText = '进行中';
+                let statusClass = 'status-active';
+                if (isCancelled) {
+                    statusText = '已取消';
+                    statusClass = 'status-cancelled';
+                } else if (isEnded) {
+                    statusText = '已结束';
+                    statusClass = 'status-ended';
+                } else if (isPending) {
+                    statusText = '未开始';
+                    statusClass = 'status-pending';
+                }
+                
+                return `
+                <tr class="${isCancelled ? 'row-cancelled' : ''}">
                     <td>
-                        <span class="status-badge ${e.status === 'active' ? 'status-active' : 'status-ended'}">
-                            ${e.status === 'active' ? '进行中' : '已结束'}
-                        </span>
+                        <strong class="${isCancelled ? 'text-cancelled' : ''}">${e.title}</strong>
+                        <div style="font-size: 12px; color: #999; margin-top: 4px;">📍 ${e.location || '未知地点'}</div>
+                    </td>
+                    <td style="font-size: 13px;">
+                        ${e.start_time || e.time}
+                        <br><span style="color:#999;">至 ${e.end_time || '待定'}</span>
                     </td>
                     <td>
-                        <button class="btn btn-primary" style="padding: 4px 8px; margin-right: 4px;"
-                                onclick="editEvent('${e.event_id}')">编辑</button>
-                        <button class="btn btn-danger" style="padding: 4px 8px;"
-                                onclick="deleteEvent('${e.event_id}')">删除</button>
+                        <span class="status-badge ${statusClass}">${statusText}</span>
+                    </td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="showEventDetail('${e.event_id}')">详情</button>
+                        <button class="btn btn-sm" onclick="editEvent('${e.event_id}')">编辑</button>
+                        <button class="btn btn-sm" style="background: ${canModify ? '#faad14' : '#d9d9d9'}; color: white;"
+                                onclick="${canModify ? `cancelEvent('${e.event_id}')` : `Toast.warning('只能取消未开始的活动')`}" ${!canModify ? 'disabled' : ''}>取消</button>
+                        <button class="btn btn-danger btn-sm" 
+                                onclick="${canModify ? `deleteEvent('${e.event_id}')` : `Toast.warning('只能删除未开始的活动')`}" ${!canModify ? 'disabled' : ''}>删除</button>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // 打开创建模态框
@@ -175,17 +295,27 @@
             document.getElementById('eventIdInput').value = 'event_' + Date.now();
             document.getElementById('eventTitle').value = '';
 
-            // 设置默认时间为当前时间+1小时
+            // 设置默认时间：开始时间为当前时间+1小时，结束时间为开始时间+2小时
             const now = new Date();
-            now.setHours(now.getHours() + 1);
-            const year = now.getFullYear();
-            const month = (now.getMonth() + 1).toString().padStart(2, '0');
-            const day = now.getDate().toString().padStart(2, '0');
-            const hour = now.getHours().toString().padStart(2, '0');
-            const minute = now.getMinutes().toString().padStart(2, '0');
-            document.getElementById('eventTime').value = `${year}-${month}-${day}T${hour}:${minute}`;
+            const startTime = new Date(now);
+            startTime.setHours(now.getHours() + 1);
+            const endTime = new Date(startTime);
+            endTime.setHours(startTime.getHours() + 2);
+            
+            const formatDate = (date) => {
+                const year = date.getFullYear();
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const day = date.getDate().toString().padStart(2, '0');
+                const hour = date.getHours().toString().padStart(2, '0');
+                const minute = date.getMinutes().toString().padStart(2, '0');
+                return `${year}-${month}-${day}T${hour}:${minute}`;
+            };
+            
+            document.getElementById('eventStartTime').value = formatDate(startTime);
+            document.getElementById('eventEndTime').value = formatDate(endTime);
 
             document.getElementById('eventLocation').value = '';
+            document.getElementById('eventOrganizer').value = '';
             document.getElementById('eventDescription').value = '';
             document.getElementById('eventModal').classList.add('active');
         }
@@ -205,16 +335,133 @@
                     document.getElementById('eventIdInput').value = event.event_id;
                     document.getElementById('eventIdInput').disabled = true;
                     document.getElementById('eventTitle').value = event.title;
-                    document.getElementById('eventTime').value = event.time.replace(' ', 'T');
+                    document.getElementById('eventStartTime').value = (event.start_time || event.time).replace(' ', 'T');
+                    document.getElementById('eventEndTime').value = (event.end_time || event.time).replace(' ', 'T');
                     document.getElementById('eventLocation').value = event.location;
+                    document.getElementById('eventOrganizer').value = event.organizer || '';
                     document.getElementById('eventDescription').value = event.description || '';
                     document.getElementById('eventModal').classList.add('active');
                 } else {
-                    alert('获取活动信息失败');
+                    Toast.error('获取活动信息失败');
                 }
             } catch (err) {
                 console.error('获取活动详情失败:', err);
-                alert('网络错误');
+                Toast.error('网络错误');
+            }
+        }
+
+        // 当前查看的活动ID
+        let currentDetailEventId = null;
+
+        // 显示活动详情弹窗
+        async function showEventDetail(eventId) {
+            currentDetailEventId = eventId;
+            try {
+                const response = await fetch(`${API_BASE}/events/detail/${eventId}`);
+                const result = await response.json();
+
+                if (result.code === 200) {
+                    const e = result.data;
+                    const statusMap = { 'pending': '未开始', 'active': '进行中', 'ended': '已结束', 'cancelled': '已取消' };
+                    const statusClass = { 'pending': 'status-pending', 'active': 'status-active', 'ended': 'status-ended', 'cancelled': 'status-cancelled' };
+                    
+                    const startTime = new Date((e.start_time || e.time).replace(' ', 'T'));
+                    const endTime = new Date((e.end_time || e.time).replace(' ', 'T'));
+                    const now = new Date();
+                    
+                    let computedStatus;
+                    if (e.status === 'cancelled') {
+                        computedStatus = 'cancelled';
+                    } else if (endTime < now) {
+                        computedStatus = 'ended';
+                    } else if (startTime > now) {
+                        computedStatus = 'pending';
+                    } else {
+                        computedStatus = 'active';
+                    }
+                    
+                    document.getElementById('eventDetailContent').innerHTML = `
+                        <div class="detail-section">
+                            <div class="detail-row">
+                                <span class="detail-label">活动ID</span>
+                                <span class="detail-value">${e.event_id}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">活动名称</span>
+                                <span class="detail-value"><strong>${e.title}</strong></span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">活动状态</span>
+                                <span class="detail-value"><span class="status-badge ${statusClass[computedStatus] || ''}">${statusMap[computedStatus] || e.status}</span></span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">活动时间</span>
+                                <span class="detail-value">${e.start_time || e.time} 至 ${e.end_time || '待定'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">活动地点</span>
+                                <span class="detail-value">${e.location || '未知'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">组织者</span>
+                                <span class="detail-value">${e.organizer || '-'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">报名人数</span>
+                                <span class="detail-value"><span style="color:#1890ff;">${e.apply_count || 0}</span> 人</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">签到人数</span>
+                                <span class="detail-value"><span style="color:#52c41a;">${e.sign_count || 0}</span> 人 (${e.sign_rate || '0%'})</span>
+                            </div>
+                            ${e.description ? `
+                            <div class="detail-row" style="flex-direction: column;">
+                                <span class="detail-label">活动描述</span>
+                                <span class="detail-value" style="margin-top: 8px; line-height: 1.6;">${e.description}</span>
+                            </div>
+                            ` : ''}
+                        </div>
+                        <div class="detail-section" style="border-top: 1px solid #f0f0f0; margin-top: 16px; padding-top: 16px;">
+                            <div style="font-size: 13px; color: #999; margin-bottom: 12px;">📝 记录信息</div>
+                            <div class="detail-row">
+                                <span class="detail-label">创建人</span>
+                                <span class="detail-value">${e.created_by || '-'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">创建时间</span>
+                                <span class="detail-value">${formatTime(e.created_at)}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">修改人</span>
+                                <span class="detail-value">${e.updated_by || '-'}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">修改时间</span>
+                                <span class="detail-value">${formatTime(e.updated_at)}</span>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('eventDetailModal').classList.add('active');
+                } else {
+                    Toast.error('获取活动信息失败');
+                }
+            } catch (err) {
+                console.error('获取活动详情失败:', err);
+                Toast.error('网络错误');
+            }
+        }
+
+        // 关闭详情弹窗
+        function closeDetailModal() {
+            document.getElementById('eventDetailModal').classList.remove('active');
+            currentDetailEventId = null;
+        }
+
+        // 从详情页编辑活动
+        function editCurrentEvent() {
+            if (currentDetailEventId) {
+                closeDetailModal();
+                editEvent(currentDetailEventId);
             }
         }
 
@@ -223,32 +470,44 @@
             const eventData = {
                 event_id: document.getElementById('eventIdInput').value.trim(),
                 title: document.getElementById('eventTitle').value.trim(),
-                time: document.getElementById('eventTime').value.replace('T', ' '),
+                start_time: document.getElementById('eventStartTime').value.replace('T', ' '),
+                end_time: document.getElementById('eventEndTime').value.replace('T', ' '),
                 location: document.getElementById('eventLocation').value.trim(),
+                organizer: document.getElementById('eventOrganizer').value.trim(),
                 description: document.getElementById('eventDescription').value.trim()
             };
 
             // 验证
             if (!eventData.event_id) {
-                alert('请输入活动ID');
+                Toast.warning('请输入活动ID');
                 return;
             }
             if (!eventData.title) {
-                alert('请输入活动名称');
+                Toast.warning('请输入活动名称');
                 return;
             }
-            if (!eventData.time) {
-                alert('请选择活动时间');
+            if (!eventData.start_time) {
+                Toast.warning('请选择活动开始时间');
+                return;
+            }
+            if (!eventData.end_time) {
+                Toast.warning('请选择活动结束时间');
                 return;
             }
             if (!eventData.location) {
-                alert('请输入活动地点');
+                Toast.warning('请输入活动地点');
+                return;
+            }
+            
+            // 验证结束时间必须晚于开始时间
+            if (new Date(eventData.end_time) <= new Date(eventData.start_time)) {
+                Toast.warning('活动结束时间必须晚于开始时间');
                 return;
             }
 
             // 验证活动ID格式
             if (!/^[a-zA-Z0-9_-]+$/.test(eventData.event_id)) {
-                alert('活动ID只能包含字母、数字、下划线和短横线');
+                Toast.warning('活动ID只能包含字母、数字、下划线和短横线');
                 return;
             }
 
@@ -257,48 +516,70 @@
                     `${API_BASE}/events/update/${editingId}` :
                     `${API_BASE}/events/create`;
 
-                const response = await fetch(url, {
-                    method: editingId ? 'PUT' : 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(eventData)
-                });
+                const result = editingId ?
+                    await api.put(url, eventData) :
+                    await api.post(url, eventData);
 
-                const result = await response.json();
-
-                if (result.code === 200) {
-                    alert(editingId ? '更新成功' : '创建成功');
+                if (result && result.code === 200) {
+                    Toast.success(editingId ? '更新成功' : '创建成功');
                     closeModal();
                     loadEvents();
                 } else {
-                    alert(result.msg || '操作失败');
+                    Toast.error(result?.detail || result?.msg || '操作失败');
                 }
             } catch (err) {
                 console.error('保存失败:', err);
-                alert('网络错误');
+                Toast.error('网络错误');
+            }
+        }
+
+        // 取消活动
+        async function cancelEvent(eventId) {
+            const confirmed = await showConfirm({
+                title: '取消活动',
+                message: '确定要取消这个活动吗？取消后将通知所有已报名的用户。',
+                type: 'warning',
+                confirmText: '确认取消'
+            });
+            if (!confirmed) return;
+
+            try {
+                const result = await api.put(`${API_BASE}/events/cancel/${eventId}`);
+
+                if (result && result.code === 200) {
+                    Toast.success('活动已取消');
+                    loadEvents();
+                } else {
+                    Toast.error(result?.detail || result?.msg || '取消失败');
+                }
+            } catch (err) {
+                console.error('取消失败:', err);
+                Toast.error('网络错误');
             }
         }
 
         // 删除活动
         async function deleteEvent(eventId) {
-            if (!confirm('确定要删除这个活动吗？')) return;
+            const confirmed = await showConfirm({
+                title: '删除活动',
+                message: '确定要删除这个活动吗？此操作不可恢复！',
+                type: 'danger',
+                confirmText: '确认删除'
+            });
+            if (!confirmed) return;
 
             try {
-                const response = await fetch(`${API_BASE}/events/delete/${eventId}`, {
-                    method: 'DELETE'
-                });
-                const result = await response.json();
+                const result = await api.delete(`${API_BASE}/events/delete/${eventId}`);
 
-                if (result.code === 200) {
-                    alert('删除成功');
+                if (result && result.code === 200) {
+                    Toast.success('删除成功');
                     loadEvents();
                 } else {
-                    alert(result.msg || '删除失败');
+                    Toast.error(result?.detail || result?.msg || '删除失败');
                 }
             } catch (err) {
                 console.error('删除失败:', err);
-                alert('网络错误');
+                Toast.error('网络错误');
             }
         }
 
@@ -309,18 +590,12 @@
         }
 
         // 搜索
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-            const keyword = e.target.value.toLowerCase();
-            const rows = document.querySelectorAll('#eventsList tr');
-
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(keyword) ? '' : 'none';
-            });
-        });
+        document.getElementById('searchInput').addEventListener('input', filterEvents);
 
         // 初始化
-        if (checkAuth()) {
+        if (api.checkAuth()) {
+            showUserName();
+            renderNav('events');
             loadEvents();
             // 每30秒刷新
             setInterval(loadEvents, 30000);

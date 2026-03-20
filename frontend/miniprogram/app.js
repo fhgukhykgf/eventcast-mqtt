@@ -3,7 +3,8 @@ const mqttManager = require('./utils/mqtt.js');
 
 App({
   globalData: {
-    baseUrl: 'http://192.168.1.64:8000/api',  // 修改为你的服务器IP
+    baseUrl: 'http://192.168.115.4:8000/api',
+    mqttWsUrl: 'ws://192.168.1.64:8083/mqtt',
     userInfo: null,
     token: null
   },
@@ -80,7 +81,31 @@ App({
   },
 
   formatTime(date, format = 'YYYY-MM-DD HH:mm') {
-    const d = new Date(date);
+    if (!date) return '时间待定';
+    let d;
+    // 处理时间字符串
+    if (typeof date === 'string') {
+      // 转换为iOS支持的格式
+      if (date.includes('T')) {
+        // 处理ISO格式时间字符串
+        const iosFriendlyDate = date.replace('T', ' ').replace(/\..*/, '');
+        d = new Date(iosFriendlyDate);
+      } else if (date.includes(' ') && date.includes('-')) {
+        // 将 'YYYY-MM-DD HH:mm' 转换为 'YYYY/MM/DD HH:mm'
+        const iosFriendlyDate = date.replace(/-/g, '/');
+        d = new Date(iosFriendlyDate);
+      } else {
+        d = new Date(date);
+      }
+    } else {
+      d = new Date(date);
+    }
+    
+    // 检查是否为有效日期
+    if (isNaN(d.getTime())) {
+      return '时间格式错误';
+    }
+    
     const year = d.getFullYear();
     const month = (d.getMonth() + 1).toString().padStart(2, '0');
     const day = d.getDate().toString().padStart(2, '0');

@@ -9,26 +9,17 @@
     </view>
   </view>
 
-  <!-- 扫码区域 -->
-  <view class="scan-area" bindtap="onScan">
-    <view class="scan-box">
-      <text class="scan-icon">📷</text>
-      <text>点击扫码签到</text>
-    </view>
-  </view>
-
-  <!-- 手动输入 -->
-  <view class="manual-input">
-    <text class="label">或手动输入活动ID</text>
-    <input class="input" placeholder="输入活动ID"
-           value="{{eventId}}" bindinput="onInputEventId" />
-  </view>
-
   <!-- 活动信息 -->
   <view class="event-info" wx:if="{{event}}">
     <text class="event-title">{{event.title}}</text>
-    <text class="event-time">🕒 {{event.time}}</text>
-    <text class="event-location">📍 {{event.location}}</text>
+    <text class="event-time">🕒 {{event.start_time || event.time || '时间待定'}} - {{event.end_time || '时间待定'}}</text>
+    <text class="event-location">📍 {{event.location || '未知地点'}}</text>
+  </view>
+
+  <!-- 无活动提示 -->
+  <view class="no-event" wx:if="{{!event && !loading}}">
+    <text class="no-event-icon">📭</text>
+    <text class="no-event-text">活动不存在</text>
   </view>
 
   <!-- 状态信息 -->
@@ -47,12 +38,24 @@
     </view>
   </view>
 
-  <!-- 签到按钮 -->
+  <!-- 提示信息 -->
+  <view class="tips" wx:if="{{event && !userStatus.hasApplied && !userStatus.hasSigned}}">
+    <text class="tips-text">您尚未报名此活动</text>
+    <button class="tips-btn" bindtap="goToEventDetail">去报名</button>
+  </view>
+  
+  <view class="tips success-tips" wx:if="{{event && userStatus.hasApplied && userStatus.hasSigned}}">
+    <text class="tips-text success">您已完成签到</text>
+  </view>
+  
+  <view class="tips" wx:if="{{event && event.status === 'ended'}}">
+    <text class="tips-text warning">活动已结束</text>
+  </view>
+
+  <!-- 扫码签到按钮 -->
   <button class="btn btn-primary sign-btn"
-          wx:if="{{canSign()}}"
-          bindtap="onSign"
-          disabled="{{signing}}"
-          loading="{{signing}}">
-    {{signing ? '签到中...' : '立即签到'}}
+          wx:if="{{event && userStatus.hasApplied && !userStatus.hasSigned && event.status !== 'ended'}}"
+          bindtap="onScan">
+    📷 扫码签到
   </button>
 </view>

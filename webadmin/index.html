@@ -94,6 +94,41 @@
             display: none;
         }
 
+        .captcha-group {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .captcha-input {
+            flex: 1;
+        }
+
+        .captcha-image {
+            width: 120px;
+            height: 44px;
+            border: 2px solid #e8e8e8;
+            border-radius: 8px;
+            cursor: pointer;
+            object-fit: contain;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #999;
+        }
+
+        .captcha-image img {
+            width: 100%;
+            height: 100%;
+            border-radius: 6px;
+        }
+
+        .captcha-image:hover {
+            border-color: #1890ff;
+        }
+
         .login-btn {
             width: 100%;
             padding: 14px;
@@ -120,39 +155,6 @@
             box-shadow: none;
         }
 
-        .test-accounts {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #f0f0f0;
-        }
-
-        .test-accounts h4 {
-            color: #666;
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-
-        .account-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: #f5f5f5;
-            border-radius: 6px;
-            margin-bottom: 8px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: background 0.3s;
-        }
-
-        .account-item:hover {
-            background: #e8e8e8;
-        }
-
-        .account-role {
-            color: #1890ff;
-            font-weight: 500;
-        }
-
         .loading {
             display: inline-block;
             width: 16px;
@@ -166,6 +168,39 @@
 
         @keyframes spin {
             to { transform: rotate(360deg); }
+        }
+
+        /* Toast 样式 */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            animation: toastIn 0.3s ease;
+        }
+
+        .toast-success { background: #f6ffed; border: 1px solid #b7eb8f; color: #52c41a; }
+        .toast-error { background: #fff2f0; border: 1px solid #ffccc7; color: #ff4d4f; }
+        .toast-warning { background: #fffbe6; border: 1px solid #ffe58f; color: #faad14; }
+        .toast-info { background: #e6f7ff; border: 1px solid #91d5ff; color: #1890ff; }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
     </style>
 </head>
@@ -188,41 +223,77 @@
             <div class="error-message" id="passwordError"></div>
         </div>
 
-        <button class="login-btn" id="loginBtn" onclick="handleLogin()">登 录</button>
-
-        <div class="test-accounts">
-            <h4>📋 测试账号（点击自动填充）</h4>
-            <div class="account-item" onclick="fillAccount('admin', 'admin123')">
-                <span class="account-role">管理员</span>
-                <span>admin / admin123</span>
+        <div class="form-group">
+            <label class="form-label">验证码</label>
+            <div class="captcha-group">
+                <input type="text" class="form-input captcha-input" id="captchaCode" placeholder="请输入验证码" maxlength="4" autocomplete="off">
+                <div class="captcha-image" id="captchaImage" onclick="refreshCaptcha()" title="点击刷新">
+                    加载中...
+                </div>
             </div>
-            <div class="account-item" onclick="fillAccount('O2023001', '123456')">
-                <span class="account-role">组织者</span>
-                <span>O2023001 / 123456</span>
-            </div>
-            <div class="account-item" onclick="fillAccount('20230001', '123456')">
-                <span class="account-role">学生</span>
-                <span>20230001 / 123456</span>
-            </div>
+            <div class="error-message" id="captchaCodeError"></div>
         </div>
+
+        <button class="login-btn" id="loginBtn" onclick="handleLogin()">登 录</button>
     </div>
 
+    <script src="config.js"></script>
     <script>
-        const API_BASE = 'http://192.168.1.64:8000/api';
+        const API_BASE = config.API_BASE;
+        let currentCaptchaId = '';
 
-        // 填充账号
-        function fillAccount(username, password) {
-            document.getElementById('username').value = username;
-            document.getElementById('password').value = password;
+        // Toast 消息提示
+        function showToast(message, type = 'info') {
+            let container = document.querySelector('.toast-container');
+            if (!container) {
+                container = document.createElement('div');
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+
+            const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<span>${icons[type] || icons.info}</span><span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // 获取验证码
+        async function refreshCaptcha() {
+            const captchaImage = document.getElementById('captchaImage');
+            captchaImage.innerHTML = '加载中...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/users/captcha`);
+                const result = await response.json();
+                
+                if (result.code === 200) {
+                    currentCaptchaId = result.data.captcha_id;
+                    captchaImage.innerHTML = `<img src="${result.data.captcha_image}" alt="验证码">`;
+                } else {
+                    captchaImage.innerHTML = '获取失败';
+                }
+            } catch (err) {
+                console.error('获取验证码失败:', err);
+                captchaImage.innerHTML = '获取失败';
+            }
         }
 
         // 显示错误
         function showError(field, message) {
             const input = document.getElementById(field);
             const errorDiv = document.getElementById(field + 'Error');
-            input.classList.add('error');
-            errorDiv.style.display = 'block';
-            errorDiv.textContent = message;
+            if (input) input.classList.add('error');
+            if (errorDiv) {
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = message;
+            }
         }
 
         // 清除错误
@@ -249,15 +320,16 @@
 
         // 保存登录状态
         function saveLogin(userInfo, token) {
-            localStorage.setItem('admin_token', token);
-            localStorage.setItem('admin_user', JSON.stringify(userInfo));
-            localStorage.setItem('admin_login_time', Date.now());
+            localStorage.setItem('token', token);
+            localStorage.setItem('userInfo', JSON.stringify(userInfo));
+            localStorage.setItem('loginTime', Date.now());
         }
 
         // 处理登录
         async function handleLogin() {
             const username = document.getElementById('username').value.trim();
             const password = document.getElementById('password').value.trim();
+            const captchaCode = document.getElementById('captchaCode').value.trim();
 
             clearErrors();
 
@@ -271,6 +343,11 @@
                 return;
             }
 
+            if (!captchaCode) {
+                showError('captchaCode', '请输入验证码');
+                return;
+            }
+
             setLoading(true);
 
             try {
@@ -281,7 +358,9 @@
                     },
                     body: JSON.stringify({
                         identifier: username,
-                        password: password
+                        password: password,
+                        captcha_id: currentCaptchaId,
+                        captcha_code: captchaCode
                     })
                 });
 
@@ -292,8 +371,9 @@
 
                     // 检查是否有管理权限
                     if (user_info.role !== 'admin' && user_info.role !== 'organizer') {
-                        alert('您的账号没有管理后台权限');
+                        showToast('您的账号没有管理后台权限', 'error');
                         setLoading(false);
+                        refreshCaptcha();
                         return;
                     }
 
@@ -302,11 +382,20 @@
                     // 跳转到看板
                     window.location.href = 'dashboard.html';
                 } else {
-                    showError('username', result.msg || '登录失败');
+                    // 登录失败，刷新验证码
+                    refreshCaptcha();
+                    document.getElementById('captchaCode').value = '';
+                    
+                    if (result.detail && result.detail.includes('验证码')) {
+                        showError('captchaCode', result.detail);
+                    } else {
+                        showError('username', result.detail || result.msg || '登录失败');
+                    }
                 }
             } catch (err) {
                 console.error('登录请求失败:', err);
-                alert('网络错误，请稍后重试');
+                showToast('网络错误，请稍后重试', 'error');
+                refreshCaptcha();
             } finally {
                 setLoading(false);
             }
@@ -314,8 +403,8 @@
 
         // 检查是否已登录
         function checkLogin() {
-            const token = localStorage.getItem('admin_token');
-            const loginTime = localStorage.getItem('admin_login_time');
+            const token = localStorage.getItem('token');
+            const loginTime = localStorage.getItem('loginTime');
 
             if (!token || !loginTime) {
                 return false;
@@ -334,10 +423,13 @@
         // 如果已登录，自动跳转
         if (checkLogin()) {
             window.location.href = 'dashboard.html';
+        } else {
+            // 加载验证码
+            refreshCaptcha();
         }
 
         // 回车登录
-        document.getElementById('password').addEventListener('keypress', (e) => {
+        document.getElementById('captchaCode').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 handleLogin();
             }

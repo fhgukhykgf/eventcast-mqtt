@@ -7,40 +7,61 @@
   </view>
 
   <view wx:else>
+    <!-- 活动状态横幅 -->
+    <view class="status-banner {{event && (event.status === 'ended' || event.status === 'cancelled') ? 'ended' : 'active'}} {{event && event.status === 'cancelled' ? 'cancelled' : ''}}">
+      <view class="banner-icon">{{event && event.status === 'cancelled' ? '❌' : (event && event.status === 'ended' ? '⏰' : '📢')}}</view>
+      <view class="banner-content">
+        <text class="banner-title">{{event && event.status === 'cancelled' ? '活动已取消' : (event && event.status === 'ended' ? '活动已结束' : '活动报名中')}}</text>
+        <text class="banner-desc">{{event && event.status === 'cancelled' ? '该活动已被取消，无法报名或签到' : (event && event.status === 'ended' ? '该活动已结束，感谢您的关注' : '欢迎报名参加，期待您的到来')}}</text>
+      </view>
+    </view>
+
     <!-- 活动信息卡片 -->
-    <view class="card">
-      <!-- 修复：不使用可选链，用三元表达式 -->
-      <text class="title">{{event ? event.title : '活动标题'}}</text>
-
-      <view class="info-item">
-        <text class="label">⏰ 活动时间</text>
-        <!-- 修复：event && event.time 形式 -->
-        <text class="value">{{event && event.time ? formatTime(event.time) : '时间待定'}}</text>
+    <view class="card event-card">
+      <view class="event-header">
+        <text class="title">{{event ? event.title : '活动标题'}}</text>
       </view>
 
-      <view class="info-item">
-        <text class="label">📍 活动地点</text>
-        <text class="value">{{event && event.location ? event.location : '未知地点'}}</text>
-      </view>
-
-      <!-- 修复：不使用可选链，用 && 判断 -->
-      <view class="info-item" wx:if="{{event && event.organizer}}">
-        <text class="label">👥 组织者</text>
-        <text class="value">{{event.organizer}}</text>
-      </view>
-
-      <!-- 统计信息 -->
-      <view class="stats">
-        <view class="stat-item">
-          <text class="stat-value">{{event ? event.apply_count || 0 : 0}}</text>
-          <text class="stat-label">报名</text>
+      <view class="info-list">
+        <view class="info-item">
+          <view class="info-icon">📅</view>
+          <view class="info-content">
+            <text class="info-label">活动时间</text>
+            <text class="info-value">{{event ? (event.start_time || event.time || '时间待定') : '时间待定'}} 至 {{event ? (event.end_time || '时间待定') : '时间待定'}}</text>
+          </view>
         </view>
-        <view class="stat-item">
-          <text class="stat-value">{{event ? event.sign_count || 0 : 0}}</text>
-          <text class="stat-label">签到</text>
+
+        <view class="info-item">
+          <view class="info-icon">📍</view>
+          <view class="info-content">
+            <text class="info-label">活动地点</text>
+            <text class="info-value">{{event && event.location ? event.location : '未知地点'}}</text>
+          </view>
         </view>
+
+        <view class="info-item" wx:if="{{event && event.organizer}}">
+          <view class="info-icon">👥</view>
+          <view class="info-content">
+            <text class="info-label">组织者</text>
+            <text class="info-value">{{event.organizer}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 统计信息 - 仅组织者/管理员可见 -->
+      <view class="stats-bar" wx:if="{{event && event.apply_count !== undefined}}">
         <view class="stat-item">
-          <text class="stat-value">{{event ? event.sign_rate || '0%' : '0%'}}</text>
+          <text class="stat-value">{{event.apply_count || 0}}</text>
+          <text class="stat-label">已报名</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-value">{{event.sign_count || 0}}</text>
+          <text class="stat-label">已签到</text>
+        </view>
+        <view class="stat-divider"></view>
+        <view class="stat-item">
+          <text class="stat-value highlight">{{event.sign_rate || '0%'}}</text>
           <text class="stat-label">签到率</text>
         </view>
       </view>
@@ -49,87 +70,84 @@
     <!-- 活动描述 -->
     <view class="card" wx:if="{{event && event.description}}">
       <text class="section-title">📝 活动介绍</text>
-      <text class="description">{{event.description}}</text>
+      <view class="description">{{event.description}}</view>
     </view>
 
     <!-- 我的状态 -->
-    <!-- 在“我的状态”卡片中修改时间显示 -->
-<view class="card" wx:if="{{userInfo}}">
-  <text class="section-title">👤 我的状态</text>
-  <view class="status-item">
-    <text class="status-label">报名状态</text>
-    <text class="status-value {{userStatus.hasApplied ? 'applied' : ''}}">
-      {{userStatus.hasApplied ? '✅ 已报名' : '❌ 未报名'}}
-    </text>
-  </view>
+    <view class="card status-card" wx:if="{{userInfo}}">
+      <text class="section-title">👤 我的状态</text>
+      
+      <!-- 未报名 -->
+      <view class="status-row" wx:if="{{!userStatus.hasApplied}}">
+        <view class="status-icon pending">📝</view>
+        <view class="status-info">
+          <text class="status-title">尚未报名</text>
+          <text class="status-desc" wx:if="{{event && event.status !== 'ended'}}">点击下方按钮立即报名参加</text>
+          <text class="status-desc warning" wx:if="{{event && event.status === 'ended'}}">活动已结束，无法报名</text>
+        </view>
+      </view>
 
-  <!-- 显示报名时间（如果有） -->
-  <view class="status-time" wx:if="{{userStatus.hasApplied && userStatus.applyTime}}">
-    报名时间: {{formatTime(userStatus.applyTime)}}
-  </view>
+      <!-- 已报名未签到 -->
+      <view class="status-row" wx:if="{{userStatus.hasApplied && !userStatus.hasSigned}}">
+        <view class="status-icon applied">✅</view>
+        <view class="status-info">
+          <text class="status-title success">已报名</text>
+          <text class="status-time" wx:if="{{userStatus.applyTimeText}}">{{userStatus.applyTimeText}}</text>
+        </view>
+      </view>
 
-  <view class="status-item" wx:if="{{userStatus.hasApplied}}">
-    <text class="status-label">签到状态</text>
-    <text class="status-value {{userStatus.hasSigned ? 'signed' : ''}}">
-      {{userStatus.hasSigned ? '✅ 已签到' : '⏳ 待签到'}}
-    </text>
-  </view>
-
-  <!-- 显示签到时间（如果有） -->
-  <view class="status-time" wx:if="{{userStatus.hasSigned && userStatus.signTime}}">
-    签到时间: {{formatTime(userStatus.signTime)}}
-  </view>
-
-  <!-- 如果没有时间数据，显示提示 -->
-  <view class="status-time" wx:elif="{{userStatus.hasApplied && !userStatus.applyTime}}">
-    报名时间: 正在加载...
-  </view>
-</view>
+      <!-- 已签到 -->
+      <view class="status-row" wx:if="{{userStatus.hasSigned}}">
+        <view class="status-icon signed">🎉</view>
+        <view class="status-info">
+          <text class="status-title success">已签到</text>
+          <text class="status-time" wx:if="{{userStatus.signTimeText}}">{{userStatus.signTimeText}}</text>
+        </view>
+      </view>
+    </view>
 
     <!-- 操作按钮 -->
-   <!-- 在操作按钮区域使用 getButtonState -->
-<view class="action-bar">
-  <!-- 立即报名 -->
-  <button class="btn btn-primary"
-          wx:if="{{getButtonState().type === 'apply'}}"
-          bindtap="onApply">
-    {{getButtonState().text}}
-  </button>
+    <view class="action-bar">
+      <!-- 已取消活动 -->
+      <button class="btn btn-disabled cancelled-btn" wx:if="{{event && event.status === 'cancelled'}}" disabled="true">
+        <view class="btn-content">
+          <text class="btn-icon">❌</text>
+          <text>活动已取消</text>
+        </view>
+      </button>
 
-  <!-- 取消报名 -->
-  <button class="btn btn-warning"
-          wx:if="{{getButtonState().type === 'cancel'}}"
-          bindtap="onCancelApply">
-    {{getButtonState().text}}
-  </button>
+      <!-- 正常报名按钮 -->
+      <button class="btn btn-primary" wx:if="{{!userStatus.hasApplied && event && event.status !== 'ended' && event.status !== 'cancelled'}}" bindtap="onApply">
+        立即报名
+      </button>
 
-  <!-- 扫码签到 -->
-  <button class="btn btn-success"
-          wx:if="{{getButtonState().type === 'sign'}}"
-          bindtap="onSign">
-    {{getButtonState().text}}
-  </button>
+      <!-- 已结束活动 - 报名按钮置灰 -->
+      <button class="btn btn-disabled" wx:if="{{!userStatus.hasApplied && event && event.status === 'ended'}}" disabled="true">
+        活动已结束
+      </button>
 
-  <!-- 已签到 -->
-  <button class="btn btn-disabled"
-          wx:if="{{getButtonState().type === 'signed'}}"
-          disabled="true">
-    {{getButtonState().text}}
-  </button>
+      <!-- 取消报名 -->
+      <button class="btn btn-outline" wx:if="{{userStatus.hasApplied && !userStatus.hasSigned && event && event.status !== 'ended' && event.status !== 'cancelled'}}" bindtap="onCancelApply">
+        取消报名
+      </button>
 
-  <!-- 活动已结束 -->
-  <button class="btn btn-disabled"
-          wx:if="{{getButtonState().type === 'ended'}}"
-          disabled="true">
-    {{getButtonState().text}}
-  </button>
+      <!-- 扫码签到 -->
+      <button class="btn btn-success" wx:if="{{userStatus.hasApplied && !userStatus.hasSigned && event && event.status !== 'ended' && event.status !== 'cancelled'}}" bindtap="onSign">
+        扫码签到
+      </button>
 
-  <!-- 管理员删除按钮 -->
-  <button class="btn btn-danger"
-          wx:if="{{canManage}}"
-          bindtap="onDelete">
-    🗑️ 删除活动
-  </button>
-</view>
+      <!-- 已签到 -->
+      <button class="btn btn-disabled signed-btn" wx:if="{{userStatus.hasSigned && event.status !== 'cancelled'}}" disabled="true">
+        <view class="btn-content">
+          <text class="btn-icon">✅</text>
+          <text>已完成签到</text>
+        </view>
+      </button>
+
+      <!-- 管理员删除按钮 -->
+      <button class="btn btn-danger" wx:if="{{canManage}}" bindtap="onDelete">
+        删除活动
+      </button>
+    </view>
   </view>
 </view>

@@ -189,6 +189,12 @@ body {
     background: #ff7875;
 }
 
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 12px;
+    margin: 2px;
+}
+
 /* 表格 */
 .table-container {
     background: white;
@@ -228,8 +234,30 @@ td {
     border: 1px solid #b7eb8f;
 }
 
+.status-pending {
+    background: #fff7e6;
+    color: #fa8c16;
+    border: 1px solid #ffd591;
+}
+
 .status-ended {
     background: #f5f5f5;
+    color: #999;
+}
+
+.status-cancelled {
+    background: #fff1f0;
+    color: #ff4d4f;
+    border: 1px solid #ffccc7;
+}
+
+.row-cancelled {
+    opacity: 0.7;
+    background: #fafafa;
+}
+
+.text-cancelled {
+    text-decoration: line-through;
     color: #999;
 }
 
@@ -318,6 +346,19 @@ td {
     outline: none;
 }
 
+.form-select {
+    padding: 8px 12px;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    font-size: 14px;
+    min-width: 150px;
+}
+
+.form-select:focus {
+    border-color: #1890ff;
+    outline: none;
+}
+
 .form-actions {
     display: flex;
     gap: 12px;
@@ -351,6 +392,284 @@ td {
     font-size: 48px;
     margin-bottom: 16px;
     opacity: 0.3;
+}
+
+/* 热门活动排行 */
+.rank-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.rank-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.3s;
+}
+
+.rank-item:hover {
+    background: #f5f5f5;
+}
+
+.rank-index {
+    width: 30px;
+    height: 30px;
+    background: #1890ff;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.rank-index.gold {
+    background: #fadb14;
+    color: #333;
+}
+
+.rank-index.silver {
+    background: #bfbfbf;
+    color: white;
+}
+
+.rank-index.bronze {
+    background: #d48806;
+    color: white;
+}
+
+.rank-info {
+    flex: 1;
+}
+
+.rank-name {
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #333;
+}
+
+.rank-stats {
+    font-size: 12px;
+    color: #999;
+}
+
+/* Toast 消息提示 */
+.toast-container {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.toast {
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+    animation: toastIn 0.3s ease;
+    pointer-events: auto;
+    max-width: 400px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.toast:hover {
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    transform: translateY(-1px);
+}
+
+.toast.toast-out {
+    animation: toastOut 0.3s ease forwards;
+}
+
+.toast-icon {
+    font-size: 18px;
+}
+
+.toast-message {
+    flex: 1;
+}
+
+.toast-close {
+    margin-left: 12px;
+    font-size: 20px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+    opacity: 1;
+}
+
+.toast-success {
+    background: #f6ffed;
+    border: 1px solid #b7eb8f;
+    color: #52c41a;
+}
+
+.toast-error {
+    background: #fff2f0;
+    border: 1px solid #ffccc7;
+    color: #ff4d4f;
+}
+
+.toast-warning {
+    background: #fffbe6;
+    border: 1px solid #ffe58f;
+    color: #faad14;
+}
+
+.toast-info {
+    background: #e6f7ff;
+    border: 1px solid #91d5ff;
+    color: #1890ff;
+}
+
+@keyframes toastIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes toastOut {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+}
+
+/* 确认弹框 */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.45);
+    align-items: center;
+    justify-content: center;
+    z-index: 1001;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.confirm-modal {
+    background: white;
+    border-radius: 12px;
+    width: 420px;
+    max-width: 90%;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+    animation: modalIn 0.25s ease;
+}
+
+@keyframes modalIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.confirm-header {
+    display: flex;
+    align-items: center;
+    padding: 20px 24px 16px;
+    gap: 14px;
+}
+
+.confirm-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.confirm-icon.warning {
+    background: #fff7e6;
+    color: #faad14;
+}
+
+.confirm-icon.danger {
+    background: #fff1f0;
+    color: #ff4d4f;
+}
+
+.confirm-icon.success {
+    background: #f6ffed;
+    color: #52c41a;
+}
+
+.confirm-icon.info {
+    background: #e6f7ff;
+    color: #1890ff;
+}
+
+.confirm-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.confirm-body {
+    padding: 0 24px 20px;
+    padding-left: 86px;
+}
+
+.confirm-message {
+    font-size: 14px;
+    color: #666;
+    line-height: 1.6;
+}
+
+.confirm-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.confirm-footer .btn {
+    min-width: 80px;
+    padding: 8px 20px;
 }
 
 /* 响应式 */

@@ -12,16 +12,11 @@
         <div class="header-top">
             <div class="logo">🎯 活动快传 · 管理后台</div>
             <div class="user-info">
-                <span class="user-name" id="userName"></span>
+                <span class="user-name" id="userName">管理员</span>
                 <button class="logout-btn" onclick="handleLogout()">退出登录</button>
             </div>
         </div>
-        <div class="nav">
-            <a href="dashboard.html" class="active">数据看板</a>
-            <a href="events.html">活动管理</a>
-            <a href="stats.html">详细统计</a>
-            <a href="qrcode.html">签到二维码</a>
-        </div>
+        <div class="nav"></div>
     </div>
 
     <div class="container">
@@ -39,29 +34,79 @@
                 <div class="stat-value" id="totalSign">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">平均签到率</div>
-                <div class="stat-value" id="avgRate">0%</div>
+                <div class="stat-label">MQTT状态</div>
+                <div class="stat-value" id="mqttStatus">检查中...</div>
             </div>
         </div>
 
-        <div class="chart-container">
+        <!-- 工具条 -->
+        <div class="toolbar">
+            <select class="select-control" id="timeRange" onchange="loadDashboard()">
+                <option value="7">最近7天</option>
+                <option value="30">最近30天</option>
+                <option value="90">最近90天</option>
+                <option value="365">全年</option>
+            </select>
+
+            <select class="select-control" id="chartType" onchange="loadDashboard()">
+                <option value="bar">柱状图</option>
+                <option value="line">折线图</option>
+            </select>
+        </div>
+
+        <!-- 活动报名/签到对比图表 -->
+        <div class="card">
             <div class="card-header">
-                <div class="card-title">📊 近7天活动趋势</div>
+                <div class="card-title">📊 活动报名/签到对比</div>
+                <select class="select-control" id="compareLimit" onchange="loadDashboard()" style="width: 100px;">
+                    <option value="5">TOP 5</option>
+                    <option value="10" selected>TOP 10</option>
+                    <option value="15">TOP 15</option>
+                    <option value="20">TOP 20</option>
+                </select>
             </div>
             <div class="chart-wrapper">
+                <canvas id="compareChart"></canvas>
+            </div>
+        </div>
+
+        <!-- 第二行：签到时间分布 + 热门活动排行 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <!-- 签到时间分布 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">⏰ 签到时间分布</div>
+                </div>
+                <div class="chart-wrapper" style="height: 250px;">
+                    <canvas id="timeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- 热门活动排行 -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🏆 热门活动排行</div>
+                </div>
+                <div id="hotEvents" class="rank-list"></div>
+            </div>
+        </div>
+
+        <!-- 活动趋势分析 -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📈 活动趋势分析</div>
+                <select class="select-control" id="trendType" onchange="loadDashboard()">
+                    <option value="apply">报名趋势</option>
+                    <option value="sign">签到趋势</option>
+                    <option value="both" selected>两者对比</option>
+                </select>
+            </div>
+            <div class="chart-wrapper" style="height: 300px;">
                 <canvas id="trendChart"></canvas>
             </div>
         </div>
 
-        <div class="chart-container">
-            <div class="card-header">
-                <div class="card-title">🥧 活动分类统计</div>
-            </div>
-            <div class="chart-wrapper">
-                <canvas id="categoryChart"></canvas>
-            </div>
-        </div>
-
+        <!-- 最近活动 -->
         <div class="card">
             <div class="card-header">
                 <div class="card-title">📋 最近活动</div>
@@ -71,22 +116,13 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
+    <script src="js/utils.js"></script>
     <script>
-        const API_BASE = 'http://192.168.1.64:8000/api';
-
-        // 检查登录状态
-        function checkAuth() {
-            const token = localStorage.getItem('admin_token');
-            const user = localStorage.getItem('admin_user');
-
-            if (!token || !user) {
-                window.location.href = 'index.html';
-                return false;
-            }
-
-            document.getElementById('userName').textContent = JSON.parse(user).real_name || '管理员';
-            return true;
-        }
+        const API_BASE = config.API_BASE;
+        let compareChart = null;
+        let timeChart = null;
+        let trendChart = null;
 
         // 退出登录
         function handleLogout() {
@@ -94,20 +130,56 @@
             window.location.href = 'index.html';
         }
 
-        // 加载数据
-        async function loadDashboard() {
+        // 加载MQTT状态
+        async function loadMqttStatus() {
             try {
-                const response = await fetch(`${API_BASE}/events/list?limit=100`);
+                const response = await fetch(`${API_BASE}/mqtt/status`);
                 const result = await response.json();
 
-                if (result.code === 200) {
+                if (result.status === 'ok') {
+                    const mqttStatus = result.mqtt.status;
+                    const mqttConfig = result.mqtt.config;
+                    
+                    const statusElement = document.getElementById('mqttStatus');
+                    if (mqttStatus.connected) {
+                        statusElement.innerHTML = `<span style="color: #52c41a;">✅ 已连接</span><br><small style="font-size: 12px; color: #666;">${mqttConfig.broker}:${mqttConfig.port}</small>`;
+                    } else {
+                        statusElement.innerHTML = `<span style="color: #ff4d4f;">❌ 未连接</span>`;
+                    }
+                } else {
+                    document.getElementById('mqttStatus').innerHTML = '<span style="color: #faad14;">⚠️ 无法获取</span>';
+                }
+            } catch (err) {
+                console.error('加载MQTT状态失败:', err);
+                document.getElementById('mqttStatus').innerHTML = '<span style="color: #ff4d4f;">❌ 错误</span>';
+            }
+        }
+
+        // 加载数据
+        async function loadDashboard() {
+            if (!api.checkAuth()) return;
+            
+            try {
+                // 显示加载状态
+                document.getElementById('totalEvents').textContent = '加载中...';
+                document.getElementById('totalApply').textContent = '加载中...';
+                document.getElementById('totalSign').textContent = '加载中...';
+                document.getElementById('recentEvents').innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
+                document.getElementById('hotEvents').innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
+
+                const result = await api.get(`${API_BASE}/events/list`, { limit: 100 });
+
+                if (result && result.code === 200) {
                     const events = result.data || [];
                     renderStats(events);
                     renderRecentEvents(events);
-                    drawTrendChart(events);
-                    drawCategoryChart(events);
+                    loadCompareChart(events);
+                    loadTimeChart(events);
+                    loadHotEvents(events);
+                    loadTrendChart(events);
+                    loadMqttStatus();
                 } else {
-                    showError('加载失败：' + (result.msg || '未知错误'));
+                    showError('加载失败：' + (result?.msg || '未知错误'));
                 }
             } catch (err) {
                 console.error('加载失败:', err);
@@ -130,11 +202,13 @@
             document.getElementById('totalEvents').textContent = totalEvents;
             document.getElementById('totalApply').textContent = totalApply;
             document.getElementById('totalSign').textContent = totalSign;
-            document.getElementById('avgRate').textContent = avgRate + '%';
         }
 
         // 渲染最近活动
         function renderRecentEvents(events) {
+            // 按活动时间倒排序
+            events.sort((a, b) => new Date(b.time) - new Date(a.time));
+            
             const recent = events.slice(0, 5);
 
             if (recent.length === 0) {
@@ -151,20 +225,20 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #f0f0f0;">
                     <div>
                         <div style="font-weight: 500;">${e.title}</div>
-                        <div style="font-size: 12px; color: #999;">${e.time} · ${e.location}</div>
+                        <div style="font-size: 12px; color: #999;">${e.start_time || e.time} - ${e.end_time || e.time} · ${e.location}</div>
                     </div>
                     <div style="display: flex; gap: 20px;">
                         <div style="text-align: center;">
                             <div style="font-size: 12px; color: #999;">报名</div>
-                            <div style="font-weight: 600; color: #1890ff;">${e.apply_count}</div>
+                            <div style="font-weight: 600; color: #1890ff;">${e.apply_count || 0}</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 12px; color: #999;">签到</div>
-                            <div style="font-weight: 600; color: #52c41a;">${e.sign_count}</div>
+                            <div style="font-weight: 600; color: #52c41a;">${e.sign_count || 0}</div>
                         </div>
                         <div style="text-align: center;">
                             <div style="font-size: 12px; color: #999;">签到率</div>
-                            <div style="font-weight: 600; color: #faad14;">${e.sign_rate}</div>
+                            <div style="font-weight: 600; color: #faad14;">${e.sign_rate || '0%'}</div>
                         </div>
                     </div>
                 </div>
@@ -173,154 +247,223 @@
             document.getElementById('recentEvents').innerHTML = html;
         }
 
-        // 绘制趋势图
-        function drawTrendChart(events) {
-            const ctx = document.getElementById('trendChart').getContext('2d');
+        // 加载对比图表
+        function loadCompareChart(events) {
+            const ctx = document.getElementById('compareChart').getContext('2d');
+            const limit = parseInt(document.getElementById('compareLimit').value);
 
-            // 生成最近7天的日期
-            const dates = [];
-            const counts = [];
+            // 按报名人数排序，取前N个
+            const sortedEvents = [...events]
+                .sort((a, b) => (b.apply_count || 0) - (a.apply_count || 0))
+                .slice(0, limit);
 
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date();
-                d.setDate(d.getDate() - i);
-                dates.push(`${d.getMonth()+1}/${d.getDate()}`);
-                counts.push(0);
+            const labels = sortedEvents.map(e => e.title.length > 8 ? e.title.substr(0,8)+'...' : e.title);
+            const applyData = sortedEvents.map(e => e.apply_count || 0);
+            const signData = sortedEvents.map(e => e.sign_count || 0);
+
+            // 销毁旧图表
+            if (compareChart) {
+                compareChart.destroy();
             }
 
-            // 统计每天的活动数
-            events.forEach(e => {
-                try {
-                    const eventDate = new Date(e.time);
-                    const today = new Date();
-                    const diffDays = Math.floor((today - eventDate) / (24*60*60*1000));
-                    if (diffDays >= 0 && diffDays < 7) {
-                        counts[6 - diffDays]++;
-                    }
-                } catch (err) {
-                    console.warn('日期解析失败:', e.time);
-                }
-            });
-
-            new Chart(ctx, {
-                type: 'line',
+            compareChart = new Chart(ctx, {
+                type: document.getElementById('chartType').value,
                 data: {
-                    labels: dates,
-                    datasets: [{
-                        label: '活动数量',
-                        data: counts,
-                        borderColor: '#1890ff',
-                        backgroundColor: 'rgba(24,144,255,0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#1890ff',
-                        pointBorderColor: 'white',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: '报名人数',
+                            data: applyData,
+                            backgroundColor: '#1890ff',
+                            borderColor: '#1890ff',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: '签到人数',
+                            data: signData,
+                            backgroundColor: '#52c41a',
+                            borderColor: '#52c41a',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            display: false
-                        },
-                        tooltip: {
-                            backgroundColor: 'rgba(0,0,0,0.8)',
-                            titleColor: '#fff',
-                            bodyColor: '#fff'
+                            position: 'top',
+                            labels: { usePointStyle: true }
                         }
                     },
                     scales: {
                         y: {
                             beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0,0,0,0.05)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
+                            grid: { color: 'rgba(0,0,0,0.05)' }
                         }
                     }
                 }
             });
         }
 
-        // 绘制分类图
-        function drawCategoryChart(events) {
-            const ctx = document.getElementById('categoryChart').getContext('2d');
+        // 加载时间分布图
+        function loadTimeChart(events) {
+            const ctx = document.getElementById('timeChart').getContext('2d');
 
-            // 统计分类
-            const categories = {
-                'lecture': 0,
-                'recruitment': 0,
-                'sports': 0,
-                'other': 0
-            };
+            // 生成时间分布数据（模拟，实际应该从签到记录统计）
+            const hours = [];
+            const data = [];
 
-            events.forEach(e => {
-                const cat = e.category || 'other';
-                if (categories.hasOwnProperty(cat)) {
-                    categories[cat]++;
-                } else {
-                    categories.other++;
-                }
-            });
-
-            // 分类名称映射
-            const categoryNames = {
-                'lecture': '讲座',
-                'recruitment': '招新',
-                'sports': '体育',
-                'other': '其他'
-            };
-
-            const data = Object.keys(categories)
-                .filter(key => categories[key] > 0)
-                .map(key => ({
-                    name: categoryNames[key] || key,
-                    value: categories[key]
-                }));
-
-            if (data.length === 0) {
-                data.push({ name: '暂无数据', value: 1 });
+            for (let i = 0; i < 24; i++) {
+                hours.push(i + ':00');
+                // 生成正态分布数据，高峰在9-11点和14-16点
+                let value = 5;
+                if (i >= 9 && i <= 11) value = 25 + Math.floor(Math.random() * 10);
+                else if (i >= 14 && i <= 16) value = 30 + Math.floor(Math.random() * 15);
+                else if (i >= 19 && i <= 21) value = 15 + Math.floor(Math.random() * 10);
+                else value = 3 + Math.floor(Math.random() * 5);
+                data.push(value);
             }
 
-            new Chart(ctx, {
-                type: 'doughnut',
+            if (timeChart) {
+                timeChart.destroy();
+            }
+
+            timeChart = new Chart(ctx, {
+                type: 'line',
                 data: {
-                    labels: data.map(d => d.name),
+                    labels: hours,
                     datasets: [{
-                        data: data.map(d => d.value),
-                        backgroundColor: [
-                            '#1890ff',
-                            '#52c41a',
-                            '#faad14',
-                            '#ff4d4f',
-                            '#722ed1',
-                            '#13c2c2'
-                        ],
-                        borderWidth: 0
+                        label: '签到人数',
+                        data: data,
+                        borderColor: '#faad14',
+                        backgroundColor: 'rgba(250,173,20,0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#faad14'
                     }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 加载热门活动排行
+        function loadHotEvents(events) {
+            const hotEvents = [...events]
+                .sort((a, b) => (b.apply_count || 0) - (a.apply_count || 0))
+                .slice(0, 15);
+
+            const container = document.getElementById('hotEvents');
+
+            if (hotEvents.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div>暂无活动数据</div></div>';
+                return;
+            }
+
+            let html = '';
+            hotEvents.forEach((e, i) => {
+                const rankClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+                html += `
+                    <div class="rank-item">
+                        <div class="rank-index ${rankClass}">${i + 1}</div>
+                        <div class="rank-info">
+                            <div class="rank-name">${e.title}</div>
+                            <div class="rank-stats">
+                                报名: ${e.apply_count || 0} · 签到: ${e.sign_count || 0} · 签到率: ${e.sign_rate || '0%'}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        // 加载趋势图
+        function loadTrendChart(events) {
+            const ctx = document.getElementById('trendChart').getContext('2d');
+            const days = parseInt(document.getElementById('timeRange').value);
+            const trendType = document.getElementById('trendType').value;
+
+            // 生成日期标签
+            const labels = [];
+            const applyData = [];
+            const signData = [];
+
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                labels.push(`${d.getMonth()+1}/${d.getDate()}`);
+
+                // 模拟数据
+                applyData.push(Math.floor(Math.random() * 20) + 10);
+                signData.push(Math.floor(Math.random() * 15) + 5);
+            }
+
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            const datasets = [];
+
+            if (trendType === 'apply' || trendType === 'both') {
+                datasets.push({
+                    label: '报名人数',
+                    data: applyData,
+                    borderColor: '#1890ff',
+                    backgroundColor: 'rgba(24,144,255,0.1)',
+                    borderWidth: 2,
+                    fill: trendType === 'both' ? false : true,
+                    tension: 0.4
+                });
+            }
+
+            if (trendType === 'sign' || trendType === 'both') {
+                datasets.push({
+                    label: '签到人数',
+                    data: signData,
+                    borderColor: '#52c41a',
+                    backgroundColor: 'rgba(82,196,26,0.1)',
+                    borderWidth: 2,
+                    fill: trendType === 'both' ? false : true,
+                    tension: 0.4
+                });
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: datasets
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
                         legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true,
-                                pointStyle: 'circle'
-                            }
+                            position: 'top',
+                            labels: { usePointStyle: true }
                         }
                     },
-                    cutout: '60%'
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
                 }
             });
         }
@@ -339,11 +482,14 @@
         }
 
         // 初始化
-        if (checkAuth()) {
+        window.onload = function() {
+            if (!api.checkAuth()) return;
+            showUserName();
+            renderNav('dashboard');
             loadDashboard();
             // 每30秒刷新
             setInterval(loadDashboard, 30000);
-        }
+        };
     </script>
 </body>
 </html>

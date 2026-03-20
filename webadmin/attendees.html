@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报名人员管理 · 活动快传</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName"></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav"></div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label class="form-label">活动选择：</label>
+                    <select class="form-select" id="eventSelect" onchange="loadAttendees()" style="min-width: 300px;">
+                        <option value="">加载中...</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索姓名或学号..." oninput="loadAttendees()">
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <label class="form-label">签到状态：</label>
+                    <select class="form-select" id="statusFilter" onchange="loadAttendees()">
+                        <option value="">全部</option>
+                        <option value="applied">未签到</option>
+                        <option value="signed">已签到</option>
+                    </select>
+                </div>
+                <button class="btn btn-success" onclick="loadAttendees()">🔄 刷新</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📋 报名人员列表</div>
+                <div id="eventInfo" style="font-size: 14px; color: #666;"></div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>姓名</th>
+                            <th>学号</th>
+                            <th>报名时间</th>
+                            <th>签到时间</th>
+                            <th>状态</th>
+                        </tr>
+                    </thead>
+                    <tbody id="attendeesList"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        const API_BASE = config.API_BASE;
+        let currentPage = 1;
+        const pageSize = 50;
+
+        // 加载活动列表
+        async function loadEvents() {
+            const select = document.getElementById('eventSelect');
+
+            try {
+                const result = await api.get(`${API_BASE}/events/list`, { limit: 100 });
+
+                if (result && result.code === 200) {
+                    const events = result.data || [];
+                    events.sort((a, b) => new Date(b.time) - new Date(a.time));
+
+                    if (events.length === 0) {
+                        select.innerHTML = '<option value="">暂无活动</option>';
+                        document.getElementById('attendeesList').innerHTML = `
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
+                                    <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
+                                    <div>暂无活动数据</div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        let options = '<option value="">请选择活动</option>';
+                        events.forEach(event => {
+                            const startTime = event.start_time || event.time;
+                            const endTime = event.end_time || event.time;
+                            options += `<option value="${event.event_id}">${event.title} (${startTime} - ${endTime})</option>`;
+                        });
+                        select.innerHTML = options;
+                    }
+                } else {
+                    select.innerHTML = '<option value="">加载失败</option>';
+                }
+            } catch (err) {
+                console.error('加载活动失败:', err);
+                select.innerHTML = '<option value="">网络错误</option>';
+            }
+        }
+
+        // 加载报名人员
+        async function loadAttendees() {
+            const eventId = document.getElementById('eventSelect').value;
+            const search = document.getElementById('searchInput').value.trim();
+            const status = document.getElementById('statusFilter').value;
+
+            if (!eventId) {
+                document.getElementById('attendeesList').innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">📋</div>
+                            <div>请选择活动</div>
+                        </td>
+                    </tr>
+                `;
+                document.getElementById('eventInfo').textContent = '';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            try {
+                // 显示加载状态
+                document.getElementById('attendeesList').innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">⏳</div>
+                            <div>加载中...</div>
+                        </td>
+                    </tr>
+                `;
+
+                // 获取活动信息
+                const eventResult = await api.get(`${API_BASE}/events/detail/${eventId}`);
+                if (eventResult && eventResult.code === 200) {
+                    const event = eventResult.data;
+                    document.getElementById('eventInfo').textContent = `${event.title} (${event.start_time || event.time} - ${event.end_time || event.time})`;
+                }
+
+                // 获取报名人员
+                const result = await api.get(`${API_BASE}/sign/all/${eventId}`, {
+                    skip: (currentPage - 1) * pageSize,
+                    limit: pageSize,
+                    search: search
+                });
+
+                if (result && result.code === 200) {
+                    const attendees = result.data || [];
+                    const total = result.total || 0;
+
+                    // 过滤状态
+                    const filteredAttendees = status ? attendees.filter(a => a.status === status) : attendees;
+
+                    if (filteredAttendees.length === 0) {
+                        document.getElementById('attendeesList').innerHTML = `
+                            <tr>
+                                <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
+                                    <div style="font-size: 48px; margin-bottom: 16px;">👥</div>
+                                    <div>暂无报名人员</div>
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        document.getElementById('attendeesList').innerHTML = filteredAttendees.map(a => `
+                            <tr>
+                                <td>${a.user_name}</td>
+                                <td>${a.user_id}</td>
+                                <td>${formatTime(a.apply_time)}</td>
+                                <td>${formatTime(a.sign_time) || '-'}</td>
+                                <td>
+                                    <span class="status-badge ${a.status === 'signed' ? 'status-active' : 'status-ended'}">
+                                        ${a.status === 'signed' ? '已签到' : '未签到'}
+                                    </span>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+
+                    renderPagination(total, filteredAttendees.length);
+                } else {
+                    document.getElementById('attendeesList').innerHTML = `
+                        <tr>
+                            <td colspan="5" style="text-align: center; padding: 60px; color: #ff4d4f;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+                                <div>加载失败: ${result?.msg || '未知错误'}</div>
+                            </tr>
+                        `;
+                }
+            } catch (err) {
+                console.error('加载报名人员失败:', err);
+                document.getElementById('attendeesList').innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 60px; color: #ff4d4f;">
+                            <div style="font-size: 48px; margin-bottom: 16px;">🌐</div>
+                            <div>网络错误，请检查后端服务</div>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        // 渲染分页
+        function renderPagination(total, filteredCount) {
+            const pagination = document.getElementById('pagination');
+            const totalPages = Math.ceil(filteredCount / pageSize);
+
+            if (totalPages <= 1) {
+                pagination.innerHTML = `<div style="text-align: center; padding: 16px; color: #666;">共 ${filteredCount} 人</div>`;
+                return;
+            }
+
+            let html = `<div style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
+                <div style="color: #666;">共 ${filteredCount} 人</div>
+                <div style="display: flex; gap: 8px;">`;
+
+            if (currentPage > 1) {
+                html += `<button class="btn" onclick="changePage(${currentPage - 1})">&lt; 上一页</button>`;
+            }
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === currentPage) {
+                    html += `<button class="btn btn-primary" disabled>${i}</button>`;
+                } else {
+                    html += `<button class="btn" onclick="changePage(${i})">${i}</button>`;
+                }
+            }
+
+            if (currentPage < totalPages) {
+                html += `<button class="btn" onclick="changePage(${currentPage + 1})">&gt; 下一页</button>`;
+            }
+
+            html += `</div></div>`;
+            pagination.innerHTML = html;
+        }
+
+        // 切换页码
+        function changePage(page) {
+            currentPage = page;
+            loadAttendees();
+        }
+
+        // 初始化
+        if (api.checkAuth()) {
+            showUserName();
+            renderNav('attendees');
+            loadEvents();
+        }
+    </script>
+</body>
+</html>

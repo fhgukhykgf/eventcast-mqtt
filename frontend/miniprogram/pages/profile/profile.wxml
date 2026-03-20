@@ -2,13 +2,14 @@
   <!-- 用户信息 -->
   <view class="user-card">
     <image class="avatar" src="{{userInfo.avatar || '/images/default-avatar.png'}}"></image>
-    <text class="user-name">{{userInfo.real_name || userInfo.user_name}}</text>
+    <text class="user-name">{{userInfo.real_name || userInfo.username}}</text>
     <text class="user-id">{{userInfo.user_id}}</text>
+    <text class="user-role">{{userInfo.role === 'admin' ? '管理员' : userInfo.role === 'organizer' ? '组织者' : '学生'}}</text>
   </view>
 
   <!-- 统计卡片 -->
   <view class="stats-card">
-    <view class="stat-item">
+    <view class="stat-item" bindtap="onMenuTap" data-action="myEvents">
       <text class="stat-value">{{stats.applyCount}}</text>
       <text class="stat-label">报名活动</text>
     </view>
@@ -22,10 +23,37 @@
     </view>
   </view>
 
+  <!-- 最近活动 -->
+  <view class="section" wx:if="{{recentActivities.length > 0}}">
+    <view class="section-header">
+      <text class="section-title">最近活动</text>
+      <text class="section-more" bindtap="onMenuTap" data-action="myEvents">查看全部 ›</text>
+    </view>
+    <view class="activity-list">
+      <block wx:for="{{recentActivities}}" wx:key="event_id">
+        <view class="activity-item" data-event-id="{{item.event_id}}" bindtap="onActivityTap">
+          <view class="activity-info">
+            <text class="activity-title">{{item.event_title}}</text>
+            <text class="activity-time">{{item.event_time}}</text>
+          </view>
+          <view class="activity-status {{item.status}}">
+            <text>{{item.status === 'signed' ? '已签到' : '已报名'}}</text>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view class="empty-state" wx:if="{{recentActivities.length === 0}}">
+    <text class="empty-text">暂无活动记录</text>
+    <text class="empty-hint">快去报名参加活动吧~</text>
+  </view>
+
   <!-- 功能菜单 -->
   <view class="menu-list">
     <block wx:for="{{menuList}}" wx:key="id">
-      <view class="menu-item" data-url="{{item.url}}" bindtap="onMenuTap">
+      <view class="menu-item" data-action="{{item.action}}" bindtap="onMenuTap">
         <text class="menu-icon">{{item.icon}}</text>
         <text class="menu-title">{{item.title}}</text>
         <text class="menu-arrow">›</text>

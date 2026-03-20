@@ -52,16 +52,13 @@ Page({
     this.setData({ loading: true });
 
     try {
+      // 筛选时一次性加载更多数据
       const params = {
-        skip: isRefresh ? 0 : (this.data.pagination.page - 1) * this.data.pagination.pageSize,
-        limit: this.data.pagination.pageSize
+        skip: 0,
+        limit: 100
       };
 
-      // 添加状态筛选
-      if (this.data.filterStatus !== 'all') {
-        params.status = this.data.filterStatus;
-      }
-
+      // 不传status给后端，前端统一筛选
       console.log('📡 请求参数:', params);
       const res = await get('/events/list', params);
       console.log('📥 完整响应:', res);
@@ -73,7 +70,7 @@ Page({
       if (Array.isArray(res)) {
         // 如果直接返回数组
         newEvents = res;
-      } else if (res && Array.isArray(res.data)) {
+      } else if (res && res.code === 200 && Array.isArray(res.data)) {
         // 如果返回 {code:200, data: [...]}
         newEvents = res.data;
       } else if (res && res.data && Array.isArray(res.data.data)) {
@@ -84,19 +81,34 @@ Page({
       console.log('📊 解析后的活动数据:', newEvents);
       console.log('📊 数据长度:', newEvents.length);
 
-      if (isRefresh) {
-        this.setData({
-          events: newEvents,
-          'pagination.page': 2,
-          'pagination.hasMore': newEvents.length >= this.data.pagination.pageSize
-        });
-      } else {
-        this.setData({
-          events: [...this.data.events, ...newEvents],
-          'pagination.page': this.data.pagination.page + 1,
-          'pagination.hasMore': newEvents.length >= this.data.pagination.pageSize
-        });
+      // 为每个活动计算状态
+      newEvents = newEvents.map(event => {
+        const statusInfo = this.getEventStatus(event);
+        return {
+          ...event,
+          statusText: statusInfo.text,
+          statusClass: statusInfo.class,
+          computedStatus: statusInfo.class
+        };
+      });
+
+      // 按活动时间倒排序
+      newEvents.sort((a, b) => {
+        const timeA = this.parseDate(a.start_time || a.time).getTime();
+        const timeB = this.parseDate(b.start_time || b.time).getTime();
+        return timeB - timeA; // 倒序排列
+      });
+
+      // 前端根据筛选条件过滤
+      let filteredEvents = newEvents;
+      if (this.data.filterStatus !== 'all') {
+        filteredEvents = newEvents.filter(event => event.computedStatus === this.data.filterStatus);
       }
+
+      this.setData({
+        events: filteredEvents,
+        'pagination.hasMore': false
+      });
 
       console.log('✅ 加载完成，当前活动数:', this.data.events.length);
 
@@ -134,11 +146,49 @@ Page({
   },
 
   getEventStatus(event) {
-    const now = new Date();
-    const eventTime = new Date(event.time);
+    // 先检查是否已取消（多种可能的值）
+    if (event.status === 'cancelled' || event.status === 'Canceled' || event.status === 'CANCELED') {
+      return { text: '已取消', class: 'cancelled' };
+    }
 
-    if (event.status === 'ended') return { text: '已结束', class: 'ended' };
-    if (eventTime < now) return { text: '进行中', class: 'active' };
-    return { text: '即将开始', class: 'upcoming' };
+    // 检查是否有状态字段
+    if (!event.status) {
+      console.warn('活动缺少状态字段:', event.event_id, event.title);
+    }
+
+    const now = new Date();
+    const eventTime = this.parseDate(event.start_time || event.time);
+    
+    // 处理结束时间
+    let eventEndTime;
+    if (event.end_time && event.end_time !== '时间待定' && event.end_time !== event.start_time) {
+      eventEndTime = this.parseDate(event.end_time);
+    } else {
+      // 默认活动时长2小时
+      eventEndTime = new Date(eventTime.getTime() + 2 * 60 * 60 * 1000);
+    }
+
+    // 如果后端状态为已结束，或者结束时间已过
+    if (event.status === 'ended' || now > eventEndTime) {
+      return { text: '已结束', class: 'ended' };
+    }
+    
+    // 活动正在进行中
+    if (now >= eventTime && now <= eventEndTime) {
+      return { text: '进行中', class: 'active' };
+    }
+
+    // 活动未开始
+    return { text: '未开始', class: 'upcoming' };
+  },
+
+  // 解析日期，兼容iOS
+  parseDate(date) {
+    if (typeof date === 'string' && date.includes(' ') && date.includes('-')) {
+      // 将 'YYYY-MM-DD HH:mm' 转换为 'YYYY/MM/DD HH:mm'
+      const iosFriendlyDate = date.replace(/-/g, '/');
+      return new Date(iosFriendlyDate);
+    }
+    return new Date(date);
   }
 });

@@ -95,7 +95,7 @@ def check_mqtt():
         return False
 
 
-def check_backend_service(host="localhost", port=8000):
+def check_backend_service(host="192.168.1.64", port=8000):
     """
     检查后端服务状态
     """

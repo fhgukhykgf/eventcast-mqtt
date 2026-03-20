@@ -7,21 +7,20 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from backend.utils.database import get_database
+from utils.database import get_database
+from utils.auth import hash_password
 
 
 async def init_database():
     """初始化数据库"""
     db = await get_database()
 
-    # 创建集合
     collections = ["events", "users", "user_apply", "sign_records"]
     for col in collections:
         if col not in await db.list_collection_names():
             await db.create_collection(col)
             print(f"创建集合: {col}")
 
-    # 创建索引
     await db.events.create_index("event_id", unique=True)
     await db.events.create_index("time")
     await db.events.create_index("status")
@@ -34,13 +33,21 @@ async def init_database():
 
     print("索引创建完成")
 
-    # 插入测试数据
     test_users = [
         {
             "user_id": "20230001",
             "username": "student01",
-            "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",  # 123456
+            "password": hash_password("123456"),
             "real_name": "张三",
+            "role": "student",
+            "status": "active",
+            "created_at": "2024-01-01T00:00:00"
+        },
+        {
+            "user_id": "20230002",
+            "username": "student02",
+            "password": hash_password("123456"),
+            "real_name": "李四",
             "role": "student",
             "status": "active",
             "created_at": "2024-01-01T00:00:00"
@@ -48,9 +55,18 @@ async def init_database():
         {
             "user_id": "O2023001",
             "username": "organizer01",
-            "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+            "password": hash_password("123456"),
             "real_name": "李组织",
             "role": "organizer",
+            "status": "active",
+            "created_at": "2024-01-01T00:00:00"
+        },
+        {
+            "user_id": "admin",
+            "username": "admin",
+            "password": hash_password("admin123"),
+            "real_name": "管理员",
+            "role": "admin",
             "status": "active",
             "created_at": "2024-01-01T00:00:00"
         }

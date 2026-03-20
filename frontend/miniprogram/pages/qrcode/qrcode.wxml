@@ -1,0 +1,75 @@
+<!-- 签到二维码页面 -->
+<view class="page">
+  <!-- 权限提示 -->
+  <view class="no-permission" wx:if="{{!hasPermission}}">
+    <text class="no-permission-icon">🔒</text>
+    <text class="no-permission-text">仅组织者和管理员可使用此功能</text>
+  </view>
+
+  <view wx:else>
+    <!-- 活动选择 -->
+    <view class="card">
+      <view class="section-title">选择活动</view>
+      <picker mode="selector" range="{{events}}" range-key="title" bindchange="onEventChange" value="{{eventIndex}}">
+        <view class="picker-value">
+          {{events[eventIndex] ? events[eventIndex].title : '请选择活动'}}
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <!-- 活动信息 -->
+    <view class="card event-info" wx:if="{{currentEvent}}">
+      <view class="info-row">
+        <text class="info-label">活动名称</text>
+        <text class="info-value">{{currentEvent.title}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">活动时间</text>
+        <text class="info-value">{{currentEvent.start_time || currentEvent.time}} - {{currentEvent.end_time}}</text>
+      </view>
+      <view class="info-row">
+        <text class="info-label">活动地点</text>
+        <text class="info-value">{{currentEvent.location}}</text>
+      </view>
+    </view>
+
+    <!-- 二维码区域 -->
+    <view class="qrcode-area" wx:if="{{currentEvent}}">
+      <view class="qrcode-box">
+        <canvas type="2d" id="qrcode" canvas-id="qrcode" class="qrcode-canvas"></canvas>
+      </view>
+      <view class="qrcode-tip" wx:if="{{showQRCode}}">
+        <text>请使用微信扫一扫签到</text>
+        <text class="expire-time" wx:if="{{expireTime}}">有效期至：{{expireTime}}</text>
+      </view>
+      <view class="qrcode-tip" wx:else>
+        <text>点击下方按钮生成签到二维码</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="btn-area">
+      <button class="btn btn-primary" bindtap="generateQRCode" wx:if="{{currentEvent && !showQRCode}}">
+        生成签到二维码
+      </button>
+      <button class="btn btn-primary" bindtap="generateQRCode" wx:if="{{showQRCode}}">
+        刷新二维码
+      </button>
+      <button class="btn btn-outline" bindtap="saveQRCode" wx:if="{{showQRCode}}">
+        保存到相册
+      </button>
+    </view>
+
+    <!-- 使用说明 -->
+    <view class="tips-card">
+      <view class="tips-title">📋 使用说明</view>
+      <view class="tips-list">
+        <text>1. 选择需要签到的活动</text>
+        <text>2. 点击生成签到二维码</text>
+        <text>3. 出示二维码给学生扫描签到</text>
+        <text>4. 二维码有效期30分钟</text>
+      </view>
+    </view>
+  </view>
+</view>

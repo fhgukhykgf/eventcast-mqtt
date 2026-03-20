@@ -2,6 +2,7 @@
 const app = getApp();
 const { get } = require('../../utils/request');
 const auth = require('../../utils/auth');
+const mqttManager = require('../../utils/mqtt.js');
 
 Page({
   data: {
@@ -11,10 +12,12 @@ Page({
       signedEvents: 0,
       signRate: '0%'
     },
+    ongoingEvents: [],
     upcomingEvents: [],
     recentEvents: [],
     loading: true,
-    refreshing: false
+    refreshing: false,
+    unreadCount: 0
   },
 
   onLoad() {
@@ -31,7 +34,10 @@ Page({
 
   onShow() {
     console.log('📱 首页显示');
-    this.setData({ userInfo: app.globalData.userInfo });
+    this.setData({ 
+      userInfo: app.globalData.userInfo,
+      unreadCount: mqttManager.getUnreadCount()
+    });
     this.loadData();
   },
 
@@ -50,6 +56,7 @@ Page({
     try {
       await Promise.all([
         this.loadStats(),
+        this.loadOngoingEvents(),
         this.loadUpcomingEvents(),
         this.loadRecentEvents()
       ]);
@@ -71,12 +78,14 @@ Page({
       const res = await get(`/users/statistics/${userId}`);
       console.log('📥 统计数据:', res);
 
-      // 修复：确保数据正确映射
+      const statsData = res.code === 200 && res.data ? res.data : res;
+      console.log('📥 处理后的统计数据:', statsData);
+
       this.setData({
         stats: {
-          totalEvents: res.apply_count || res.totalEvents || 0,
-          signedEvents: res.sign_count || res.signedEvents || 0,
-          signRate: res.sign_rate || res.signRate || '0%'
+          totalEvents: statsData.apply_count || statsData.totalEvents || 0,
+          signedEvents: statsData.sign_count || statsData.signedEvents || 0,
+          signRate: statsData.sign_rate || statsData.signRate || '0%'
         }
       });
     } catch (err) {
@@ -84,14 +93,78 @@ Page({
     }
   },
 
+  async loadOngoingEvents() {
+    try {
+      const res = await get('/events/list', { status: 'active', limit: 10 });
+      console.log('📥 所有活动:', res);
+
+      let events = [];
+      if (res.code === 200 && res.data) {
+        events = res.data;
+      } else if (Array.isArray(res)) {
+        events = res;
+      }
+
+      const now = new Date();
+      
+      // 筛选进行中的活动（开始时间<=现在<=结束时间）
+      const ongoingEvents = events.filter(event => {
+        if (event.status === 'cancelled') return false;
+        
+        const startTime = this.parseDate(event.start_time || event.time);
+        const endTime = event.end_time && event.end_time !== '时间待定' 
+          ? this.parseDate(event.end_time) 
+          : new Date(startTime.getTime() + 2 * 60 * 60 * 1000);
+        
+        return now >= startTime && now <= endTime;
+      });
+
+      // 按开始时间排序
+      ongoingEvents.sort((a, b) => {
+        const timeA = this.parseDate(a.start_time || a.time).getTime();
+        const timeB = this.parseDate(b.start_time || b.time).getTime();
+        return timeA - timeB;
+      });
+
+      this.setData({ ongoingEvents: ongoingEvents.slice(0, 3) });
+      console.log('📥 进行中的活动:', ongoingEvents.slice(0, 3));
+    } catch (err) {
+      console.error('❌ 加载进行中活动失败:', err);
+    }
+  },
+
   async loadUpcomingEvents() {
     try {
-      const res = await get('/events/list', { status: 'active', limit: 3 });
+      const res = await get('/events/list', { status: 'active', limit: 10 });
       console.log('📥 即将开始的活动:', res);
 
-      // 修复：res.data 才是真正的数据数组
-      const events = res.data || [];
-      this.setData({ upcomingEvents: events });
+      let events = [];
+      if (res.code === 200 && res.data) {
+        events = res.data;
+      } else if (Array.isArray(res)) {
+        events = res;
+      }
+
+      const now = new Date();
+      
+      // 筛选即将开始的活动（开始时间>现在）
+      const upcomingEvents = events.filter(event => {
+        if (event.status === 'cancelled') return false;
+        
+        const startTime = this.parseDate(event.start_time || event.time);
+        
+        return now < startTime;
+      });
+
+      // 按开始时间正序排列
+      upcomingEvents.sort((a, b) => {
+        const timeA = this.parseDate(a.start_time || a.time).getTime();
+        const timeB = this.parseDate(b.start_time || b.time).getTime();
+        return timeA - timeB;
+      });
+
+      this.setData({ upcomingEvents: upcomingEvents.slice(0, 3) });
+      console.log('📥 即将开始的活动:', upcomingEvents.slice(0, 3));
     } catch (err) {
       console.error('❌ 加载活动失败:', err);
     }
@@ -105,34 +178,55 @@ Page({
       const res = await get(`/sign/user/${userId}`, { limit: 3 });
       console.log('📥 最近参与的活动:', res);
 
-      // 修复：res.data 才是真正的数据数组
-      const events = res.data || [];
+      let events = [];
+      if (res.code === 200 && res.data) {
+        events = res.data;
+      } else if (Array.isArray(res)) {
+        events = res;
+      }
+      
+      events = events.map(event => {
+        const statusInfo = this.getEventStatusInfo(event);
+        return {
+          ...event,
+          statusText: statusInfo.text,
+          statusClass: statusInfo.className
+        };
+      });
+      
       this.setData({ recentEvents: events });
+      console.log('📥 处理后的最近活动数据:', events);
     } catch (err) {
       console.error('❌ 加载最近活动失败:', err);
     }
   },
 
-  // 修复扫码签到函数
   onScanTap() {
     console.log('📷 点击扫码签到');
 
-    // 检查是否登录
     if (!auth.checkLogin()) {
       wx.showToast({ title: '请先登录', icon: 'none' });
       return;
     }
 
-    // 调用微信扫码API
     wx.scanCode({
-      onlyFromCamera: false, // 允许从相册选择
-      scanType: ['qrCode'], // 只扫描二维码
+      onlyFromCamera: false,
+      scanType: ['qrCode'],
       success: (res) => {
         console.log('✅ 扫码成功:', res);
-        const eventId = res.result;
+        let eventId = res.result;
+        
+        try {
+          const qrData = JSON.parse(res.result);
+          if (qrData.event_id) {
+            eventId = qrData.event_id;
+            console.log('解析到活动ID:', eventId);
+          }
+        } catch (e) {
+          console.log('非JSON格式，直接使用:', eventId);
+        }
 
         if (eventId) {
-          // 跳转到签到页面
           wx.navigateTo({
             url: `/pages/signin/signin?eventId=${eventId}`,
             success: () => console.log('跳转到签到页成功'),
@@ -163,30 +257,70 @@ Page({
     wx.switchTab({ url: '/pages/events/events' });
   },
 
-  // 获取活动状态文本
-  getEventStatusText(item) {
-    if (item.sign_time) {
-      return '已签到';
+  onNotificationTap() {
+    const notifications = mqttManager.getNotifications();
+    const unreadCount = mqttManager.getUnreadCount();
+    
+    if (notifications.length === 0) {
+      wx.showToast({
+        title: '暂无通知',
+        icon: 'none'
+      });
+      return;
     }
-    const now = new Date();
-    const eventTime = new Date(item.event_time || item.time);
-    if (eventTime < now) {
-      return '未签到';
-    }
-    return '待参加';
+
+    // 显示通知列表
+    const itemList = notifications.slice(0, 10).map(n => 
+      `${n.read ? '  ' : '🔴 '}${n.title}`
+    );
+
+    wx.showActionSheet({
+      itemList: itemList,
+      itemColor: '#333',
+      success: (res) => {
+        const notification = notifications[res.tapIndex];
+        if (notification) {
+          mqttManager.markAsRead(notification.id);
+          this.setData({ unreadCount: mqttManager.getUnreadCount() });
+          
+          // 如果有活动ID，跳转到活动详情
+          if (notification.event_id) {
+            wx.navigateTo({ url: `/pages/event-detail/event-detail?eventId=${notification.event_id}` });
+          }
+        }
+      }
+    });
+
+    // 标记全部已读
+    mqttManager.markAllAsRead();
+    this.setData({ unreadCount: 0 });
   },
 
-  // 获取活动状态类名
-  getEventStatusClass(item) {
+  getEventStatusInfo(item) {
+    // 先检查活动是否已取消（使用 event_status 字段）
+    if (item.event_status === 'cancelled') {
+      return { text: '已取消', className: 'cancelled' };
+    }
+
     if (item.sign_time) {
-      return 'signed';
+      return { text: '已签到', className: 'signed' };
     }
+    
     const now = new Date();
-    const eventTime = new Date(item.event_time || item.time);
-    if (eventTime < now) {
-      return 'missed';
+    const eventTime = this.parseDate(item.event_time || item.time);
+    const eventEndTime = item.event_end_time ? this.parseDate(item.event_end_time) : new Date(eventTime.getTime() + 2 * 60 * 60 * 1000);
+    
+    if (now > eventEndTime) {
+      if (!item.sign_time) {
+        return { text: '未签到', className: 'missed' };
+      }
     }
-    return 'upcoming';
+    
+    if (now >= eventTime && now <= eventEndTime) {
+      return { text: '进行中', className: 'active' };
+    }
+    
+    return { text: '待参加', className: 'upcoming' };
   },
 
   formatTime(time) {
@@ -195,5 +329,13 @@ Page({
 
   getTimeDiff(time) {
     return app.getTimeDiff(time);
+  },
+
+  parseDate(date) {
+    if (typeof date === 'string' && date.includes(' ') && date.includes('-')) {
+      const iosFriendlyDate = date.replace(/-/g, '/');
+      return new Date(iosFriendlyDate);
+    }
+    return new Date(date);
   }
 });

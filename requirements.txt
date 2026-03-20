@@ -9,16 +9,14 @@ pymongo==4.6.0
 motor==3.7.1
 
 # MQTT客户端
-paho-mqtt==1.6.1
+paho-mqtt==2.1.0
 
-# 数据处理
-pandas==2.1.3
-openpyxl==3.1.2
+# 图片处理（验证码）
+Pillow==10.1.0
 
 # 加密与安全
-cryptography==41.0.7
+bcrypt==4.1.2
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
 
 # 工具类
 python-dotenv==1.0.0

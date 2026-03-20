@@ -1,6 +1,5 @@
 <view class="page">
   <view class="header">
-    <image class="logo" src="/images/logo.png"></image>
     <text class="title">活动快传</text>
     <text class="slogan">校园活动管理专家</text>
   </view>
@@ -32,6 +31,20 @@
                bindinput="onLoginInput" />
         <text class="error-text" wx:if="{{errors.password}}">{{errors.password}}</text>
       </view>
+
+      <view class="form-group captcha-group">
+        <input class="form-input captcha-input {{errors.captchaCode ? 'error' : ''}}"
+               placeholder="验证码"
+               value="{{loginForm.captchaCode}}"
+               data-field="captchaCode"
+               bindinput="onLoginInput" />
+        <image class="captcha-image" src="{{captchaImage}}" mode="aspectFit" bindtap="refreshCaptcha" wx:if="{{captchaImage}}"></image>
+        <view class="captcha-placeholder" bindtap="refreshCaptcha" wx:else>
+          <text>点击获取</text>
+        </view>
+        <text class="error-text" wx:if="{{errors.captchaCode}}">{{errors.captchaCode}}</text>
+      </view>
+      <text class="captcha-tip" bindtap="refreshCaptcha">看不清？点击刷新</text>
 
       <button class="btn btn-primary"
               bindtap="onLogin"
@@ -107,7 +120,9 @@
       </view>
 
       <view class="agreement">
-        <checkbox checked="{{agreeProtocol}}" bindchange="onAgreeChange" />
+        <checkbox-group bindchange="onAgreeChange">
+          <checkbox value="agree" checked="{{agreeProtocol}}" />
+        </checkbox-group>
         <text>我已阅读并同意 <text class="link">《用户协议》</text></text>
       </view>
 
@@ -117,14 +132,6 @@
               loading="{{loading}}">
         {{loading ? '注册中...' : '注册'}}
       </button>
-    </view>
-
-    <!-- 其他登录方式 -->
-    <view class="other-login">
-      <text class="divider">其他方式</text>
-      <view class="other-buttons">
-        <button class="other-btn" bindtap="onGuestLogin">游客访问</button>
-      </view>
     </view>
   </view>
 </view>

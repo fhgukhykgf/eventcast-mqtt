@@ -1,0 +1,162 @@
+/* 签到二维码页面 */
+.page {
+  min-height: 100vh;
+  background: #f5f5f5;
+  padding: 20rpx;
+}
+
+.no-permission {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 200rpx 40rpx;
+  text-align: center;
+}
+
+.no-permission-icon {
+  font-size: 100rpx;
+  margin-bottom: 30rpx;
+}
+
+.no-permission-text {
+  font-size: 32rpx;
+  color: #999;
+}
+
+.card {
+  background: white;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  margin-bottom: 20rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  margin-bottom: 20rpx;
+  color: #333;
+}
+
+.picker-value {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx;
+  background: #f5f5f5;
+  border-radius: 12rpx;
+  font-size: 30rpx;
+  color: #333;
+}
+
+.picker-arrow {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.event-info {
+  background: linear-gradient(135deg, #e6f7ff 0%, #f0f5ff 100%);
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(0,0,0,0.05);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: #666;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+.qrcode-area {
+  background: white;
+  border-radius: 16rpx;
+  padding: 40rpx;
+  margin-bottom: 20rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qrcode-box {
+  padding: 20rpx;
+  background: white;
+  border-radius: 16rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0,0,0,0.1);
+  margin-bottom: 20rpx;
+}
+
+.qrcode-canvas {
+  width: 400rpx !important;
+  height: 400rpx !important;
+  display: block;
+}
+
+.qrcode-tip {
+  margin-top: 30rpx;
+  text-align: center;
+}
+
+.qrcode-tip text {
+  display: block;
+  font-size: 28rpx;
+  color: #666;
+}
+
+.expire-time {
+  color: #ff4d4f !important;
+  margin-top: 10rpx;
+  font-size: 24rpx !important;
+}
+
+.btn-area {
+  padding: 20rpx 0;
+}
+
+.btn-area .btn {
+  margin-bottom: 20rpx;
+}
+
+.btn-primary {
+  background: #1890ff;
+  color: white;
+}
+
+.btn-outline {
+  background: white;
+  color: #1890ff;
+  border: 2rpx solid #1890ff;
+}
+
+.tips-card {
+  background: #fffbe6;
+  border-radius: 16rpx;
+  padding: 30rpx;
+  border-left: 6rpx solid #faad14;
+}
+
+.tips-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #d48806;
+  margin-bottom: 20rpx;
+}
+
+.tips-list text {
+  display: block;
+  font-size: 26rpx;
+  color: #666;
+  line-height: 2;
+}

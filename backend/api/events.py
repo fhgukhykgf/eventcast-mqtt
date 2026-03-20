@@ -1,13 +1,15 @@
 """
 活动管理接口
 """
-from fastapi import APIRouter, HTTPException
-from typing import Optional
+from fastapi import APIRouter, HTTPException, Depends
+from typing import Optional, Dict, Any
 from datetime import datetime
 import logging
 
 from utils.database import get_database
 from utils.mqtt_client import publish_message, is_mqtt_connected
+from utils.auth import get_current_user, require_organizer, TokenData, get_current_user_optional
+from utils.log_utils import log_operation
 from models.event import EventCreate, EventUpdate
 
 router = APIRouter()
@@ -15,55 +17,82 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/create")
-async def create_event(event: EventCreate):
+async def create_event(event: EventCreate, current_user: TokenData = Depends(require_organizer)):
     """
-    创建新活动
+    创建新活动（需组织者或管理员权限）
     """
     try:
         db = await get_database()
         events = db["events"]
 
-        # 检查活动ID是否已存在
         existing = await events.find_one({"event_id": event.event_id})
         if existing:
             raise HTTPException(status_code=400, detail="活动ID已存在")
 
-        # 准备活动数据
         event_data = event.dict()
+        if not event_data.get('time'):
+            event_data['time'] = event_data['start_time']
         event_data.update({
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
             "status": "active",
             "apply_count": 0,
             "sign_count": 0,
-            "is_deleted": False
+            "is_deleted": False,
+            "created_by": current_user.user_id
         })
 
-        # 插入数据库
         await events.insert_one(event_data)
 
-        # 发送MQTT通知（同步调用，不加await）
         try:
             if is_mqtt_connected():
+                # 发布到活动专属 topic
                 publish_message(
                     topic=f"event/{event.event_id}/notice",
                     payload={
                         "type": "event_create",
                         "event_id": event.event_id,
                         "title": event.title,
-                        "time": event.time,
+                        "time": event_data['time'],
+                        "start_time": event_data.get('start_time'),
+                        "end_time": event_data.get('end_time'),
                         "location": event.location,
                         "timestamp": datetime.now().isoformat()
                     }
                 )
-                logger.info(f"📨 MQTT通知已发送: event/{event.event_id}/notice")
+                # 同时发布到系统广播，让所有用户收到新活动通知
+                publish_message(
+                    topic="system/broadcast",
+                    payload={
+                        "type": "event_create",
+                        "event_id": event.event_id,
+                        "title": event.title,
+                        "time": event_data['time'],
+                        "start_time": event_data.get('start_time'),
+                        "end_time": event_data.get('end_time'),
+                        "location": event.location,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                logger.info(f"📨 MQTT通知已发送: event/{event.event_id}/notice 和 system/broadcast")
             else:
                 logger.warning("⚠️ MQTT未连接，跳过通知发送")
         except Exception as mqtt_error:
-            # MQTT错误不影响主流程，只记录日志
             logger.warning(f"⚠️ MQTT通知发送失败: {mqtt_error}")
 
         logger.info(f"✅ 活动创建成功: {event.event_id} - {event.title}")
+
+        await log_operation(
+            log_type="operation",
+            user_id=current_user.user_id,
+            user_name=current_user.user_id,
+            action="create",
+            target_type="event",
+            target_id=event.event_id,
+            target_name=event.title,
+            detail=f"创建活动: {event.title}",
+            source="webadmin"
+        )
 
         return {
             "code": 200,
@@ -83,17 +112,18 @@ async def get_events(
         status: Optional[str] = None,
         skip: int = 0,
         limit: int = 20,
-        search: Optional[str] = None
+        search: Optional[str] = None,
+        current_user: Optional[TokenData] = Depends(get_current_user_optional)
 ):
     """
-    获取活动列表
+    获取活动列表（公开接口）
+    学生不显示签到数据，组织者/管理员显示完整数据
     """
     try:
         db = await get_database()
         events = db["events"]
 
-        # 构建查询条件
-        query = {"is_deleted": {"$ne": True}}
+        query: Dict[str, Any] = {"is_deleted": {"$ne": True}}
         if status:
             query["status"] = status
         if search:
@@ -102,32 +132,40 @@ async def get_events(
                 {"location": {"$regex": search, "$options": "i"}}
             ]
 
-        # 查询总数
         total = await events.count_documents(query)
 
-        # 查询数据
         cursor = events.find(query).sort("time", 1).skip(skip).limit(limit)
         items = await cursor.to_list(length=limit)
 
-        # 格式化返回
+        # 判断是否为组织者或管理员
+        is_organizer = False
+        if current_user and current_user.role in ['organizer', 'admin']:
+            is_organizer = True
+
         result = []
         for item in items:
-            sign_rate = 0
-            if item.get("apply_count", 0) > 0:
-                sign_rate = round(item["sign_count"] / item["apply_count"] * 100, 2)
-
-            result.append({
+            event_data = {
                 "event_id": item["event_id"],
                 "title": item["title"],
                 "time": item["time"],
+                "start_time": item.get("start_time", item["time"]),
+                "end_time": item.get("end_time", item["time"]),
                 "location": item["location"],
                 "status": item["status"],
-                "apply_count": item["apply_count"],
-                "sign_count": item["sign_count"],
-                "sign_rate": f"{sign_rate}%",
                 "organizer": item.get("organizer", ""),
                 "description": item.get("description", "")
-            })
+            }
+            
+            # 只有组织者/管理员能看到签到数据
+            if is_organizer:
+                sign_rate = 0
+                if item.get("apply_count", 0) > 0:
+                    sign_rate = round(item["sign_count"] / item["apply_count"] * 100, 2)
+                event_data["apply_count"] = item["apply_count"]
+                event_data["sign_count"] = item["sign_count"]
+                event_data["sign_rate"] = f"{sign_rate}%"
+
+            result.append(event_data)
 
         return {
             "code": 200,
@@ -141,9 +179,13 @@ async def get_events(
 
 
 @router.get("/detail/{event_id}")
-async def get_event_detail(event_id: str):
+async def get_event_detail(
+    event_id: str,
+    current_user: Optional[TokenData] = Depends(get_current_user_optional)
+):
     """
-    获取活动详情
+    获取活动详情（公开接口）
+    学生不显示签到数据，组织者/管理员显示完整数据
     """
     try:
         db = await get_database()
@@ -152,26 +194,40 @@ async def get_event_detail(event_id: str):
         if not event or event.get("is_deleted"):
             raise HTTPException(status_code=404, detail="活动不存在")
 
-        sign_rate = 0
-        if event.get("apply_count", 0) > 0:
-            sign_rate = round(event["sign_count"] / event["apply_count"] * 100, 2)
+        # 判断是否为组织者或管理员
+        is_organizer = False
+        if current_user and current_user.role in ['organizer', 'admin']:
+            is_organizer = True
+
+        event_data = {
+            "event_id": event["event_id"],
+            "title": event["title"],
+            "time": event["time"],
+            "start_time": event.get("start_time", event["time"]),
+            "end_time": event.get("end_time", event["time"]),
+            "location": event["location"],
+            "status": event["status"],
+            "organizer": event.get("organizer", ""),
+            "description": event.get("description", ""),
+            "limit_num": event.get("limit_num"),
+            "created_at": event.get("created_at"),
+            "created_by": event.get("created_by"),
+            "updated_at": event.get("updated_at"),
+            "updated_by": event.get("updated_by")
+        }
+
+        # 只有组织者/管理员能看到签到数据
+        if is_organizer:
+            sign_rate = 0
+            if event.get("apply_count", 0) > 0:
+                sign_rate = round(event["sign_count"] / event["apply_count"] * 100, 2)
+            event_data["apply_count"] = event["apply_count"]
+            event_data["sign_count"] = event["sign_count"]
+            event_data["sign_rate"] = f"{sign_rate}%"
 
         return {
             "code": 200,
-            "data": {
-                "event_id": event["event_id"],
-                "title": event["title"],
-                "time": event["time"],
-                "location": event["location"],
-                "status": event["status"],
-                "apply_count": event["apply_count"],
-                "sign_count": event["sign_count"],
-                "sign_rate": f"{sign_rate}%",
-                "organizer": event.get("organizer", ""),
-                "description": event.get("description", ""),
-                "limit_num": event.get("limit_num"),
-                "created_at": event.get("created_at")
-            }
+            "data": event_data
         }
 
     except HTTPException:
@@ -182,23 +238,22 @@ async def get_event_detail(event_id: str):
 
 
 @router.put("/update/{event_id}")
-async def update_event(event_id: str, event_update: EventUpdate):
+async def update_event(event_id: str, event_update: EventUpdate, current_user: TokenData = Depends(require_organizer)):
     """
-    更新活动信息
+    更新活动信息（需组织者或管理员权限）
     """
     try:
         db = await get_database()
         events = db["events"]
 
-        # 检查活动是否存在
         event = await events.find_one({"event_id": event_id})
         if not event:
             raise HTTPException(status_code=404, detail="活动不存在")
 
-        # 更新数据
         update_data = event_update.dict(exclude_unset=True)
         if update_data:
             update_data["updated_at"] = datetime.now().isoformat()
+            update_data["updated_by"] = current_user.user_id
 
             result = await events.update_one(
                 {"event_id": event_id},
@@ -208,14 +263,38 @@ async def update_event(event_id: str, event_update: EventUpdate):
             if result.modified_count > 0:
                 logger.info(f"✅ 活动更新成功: {event_id}")
 
-                # 发送MQTT通知
+                # 记录操作日志
+                await log_operation(
+                    log_type="operation",
+                    user_id=current_user.user_id or "unknown",
+                    user_name=current_user.user_id or "unknown",
+                    action="update",
+                    target_type="event",
+                    target_id=event_id,
+                    target_name=event.get("title"),
+                    detail=f"更新活动: {event.get('title')}",
+                    source="webadmin"
+                )
+
                 try:
                     if is_mqtt_connected():
+                        # 发布到活动专属 topic
                         publish_message(
                             topic=f"event/{event_id}/notice",
                             payload={
                                 "type": "event_update",
                                 "event_id": event_id,
+                                "event_title": event.get("title"),
+                                "timestamp": datetime.now().isoformat()
+                            }
+                        )
+                        # 同时发布到系统广播
+                        publish_message(
+                            topic="system/broadcast",
+                            payload={
+                                "type": "event_update",
+                                "event_id": event_id,
+                                "event_title": event.get("title"),
                                 "timestamp": datetime.now().isoformat()
                             }
                         )
@@ -231,16 +310,95 @@ async def update_event(event_id: str, event_update: EventUpdate):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/delete/{event_id}")
-async def delete_event(event_id: str):
+@router.put("/cancel/{event_id}")
+async def cancel_event(event_id: str, current_user: TokenData = Depends(require_organizer)):
     """
-    删除活动（软删除）
+    取消活动（需组织者或管理员权限）
     """
     try:
         db = await get_database()
         events = db["events"]
 
-        # 软删除：标记为已删除
+        event = await events.find_one({"event_id": event_id})
+        if not event:
+            raise HTTPException(status_code=404, detail="活动不存在")
+
+        if event.get("status") == "cancelled":
+            raise HTTPException(status_code=400, detail="活动已取消")
+
+        result = await events.update_one(
+            {"event_id": event_id},
+            {"$set": {
+                "status": "cancelled",
+                "updated_at": datetime.now().isoformat()
+            }}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=500, detail="取消失败")
+
+        logger.info(f"✅ 活动取消成功: {event_id}")
+
+        # 记录操作日志
+        await log_operation(
+            log_type="operation",
+            user_id=current_user.user_id,
+            user_name=current_user.user_id,
+            action="cancel",
+            target_type="event",
+            target_id=event_id,
+            target_name=event.get("title"),
+            detail=f"取消活动: {event.get('title')}",
+            source="webadmin"
+        )
+
+        try:
+            if is_mqtt_connected():
+                # 发布到活动专属 topic
+                publish_message(
+                    topic=f"event/{event_id}/notice",
+                    payload={
+                        "type": "event_cancel",
+                        "event_id": event_id,
+                        "event_title": event.get("title"),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                # 同时发布到系统广播
+                publish_message(
+                    topic="system/broadcast",
+                    payload={
+                        "type": "event_cancel",
+                        "event_id": event_id,
+                        "event_title": event.get("title"),
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+        except Exception as mqtt_error:
+            logger.warning(f"⚠️ MQTT通知发送失败: {mqtt_error}")
+
+        return {"code": 200, "msg": "活动已取消"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ 取消活动失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/delete/{event_id}")
+async def delete_event(event_id: str, current_user: TokenData = Depends(require_organizer)):
+    """
+    删除活动（需组织者或管理员权限，软删除）
+    """
+    try:
+        db = await get_database()
+        events = db["events"]
+
+        # 先获取活动信息用于日志
+        event = await events.find_one({"event_id": event_id})
+        event_title = event.get("title") if event else event_id
+
         result = await events.update_one(
             {"event_id": event_id},
             {"$set": {
@@ -255,11 +413,33 @@ async def delete_event(event_id: str):
 
         logger.info(f"✅ 活动删除成功: {event_id}")
 
-        # 发送MQTT通知
+        # 记录操作日志
+        await log_operation(
+            log_type="operation",
+            user_id=current_user.user_id,
+            user_name=current_user.user_id,
+            action="delete",
+            target_type="event",
+            target_id=event_id,
+            target_name=event_title,
+            detail=f"删除活动: {event_title}",
+            source="webadmin"
+        )
+
         try:
             if is_mqtt_connected():
+                # 发布到活动专属 topic
                 publish_message(
                     topic=f"event/{event_id}/notice",
+                    payload={
+                        "type": "event_delete",
+                        "event_id": event_id,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                )
+                # 同时发布到系统广播
+                publish_message(
+                    topic="system/broadcast",
                     payload={
                         "type": "event_delete",
                         "event_id": event_id,
@@ -279,9 +459,9 @@ async def delete_event(event_id: str):
 
 
 @router.get("/statistics/{event_id}")
-async def get_event_statistics(event_id: str):
+async def get_event_statistics(event_id: str, current_user: TokenData = Depends(get_current_user)):
     """
-    获取活动统计数据
+    获取活动统计数据（需登录）
     """
     try:
         db = await get_database()
@@ -290,12 +470,10 @@ async def get_event_statistics(event_id: str):
         if not event:
             raise HTTPException(status_code=404, detail="活动不存在")
 
-        # 获取签到记录
         sign_records = await db["sign_records"].find(
             {"event_id": event_id}
         ).to_list(None)
 
-        # 统计签到时间分布
         time_distribution = {}
         for record in sign_records:
             sign_time = record.get("sign_time")

@@ -26,26 +26,20 @@
   margin-bottom: 20rpx;
 }
 
-.manual-input {
-  background: white;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 30rpx;
+.no-event {
+  text-align: center;
+  padding: 80rpx 30rpx;
 }
 
-.label {
-  font-size: 28rpx;
-  color: #666;
-  margin-bottom: 16rpx;
+.no-event-icon {
+  font-size: 100rpx;
   display: block;
+  margin-bottom: 20rpx;
 }
 
-.input {
-  height: 80rpx;
-  border: 2rpx solid #f0f0f0;
-  border-radius: 12rpx;
-  padding: 0 20rpx;
-  font-size: 28rpx;
+.no-event-text {
+  font-size: 32rpx;
+  color: #999;
 }
 
 .event-info {
@@ -111,7 +105,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -121,18 +115,19 @@
 .success-content {
   background: white;
   border-radius: 24rpx;
-  padding: 60rpx;
+  padding: 60rpx 80rpx;
   text-align: center;
+  box-shadow: 0 20rpx 60rpx rgba(0,0,0,0.3);
 }
 
 .success-icon {
-  font-size: 100rpx;
+  font-size: 120rpx;
   display: block;
   margin-bottom: 30rpx;
 }
 
 .success-title {
-  font-size: 40rpx;
+  font-size: 44rpx;
   font-weight: 600;
   color: #52c41a;
   display: block;
@@ -142,4 +137,59 @@
 .success-time {
   font-size: 28rpx;
   color: #666;
+  display: block;
+  line-height: 1.5;
+}
+
+.tips {
+  background: #fff7e6;
+  border-radius: 12rpx;
+  padding: 20rpx 30rpx;
+  margin-bottom: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tips-text {
+  font-size: 28rpx;
+  color: #fa8c16;
+  flex: 1;
+}
+
+.tips-text.warning {
+  color: #ff4d4f;
+}
+
+.tips-text.success {
+  color: #52c41a;
+}
+
+.success-tips {
+  background: #f6ffed;
+}
+
+.tips-btn {
+  font-size: 24rpx;
+  padding: 10rpx 24rpx;
+  background: #1890ff;
+  color: white;
+  border-radius: 20rpx;
+  margin-left: 20rpx;
+}
+
+.tips-btn::after {
+  border: none;
+}
+
+.btn {
+  height: 88rpx;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  color: white;
 }

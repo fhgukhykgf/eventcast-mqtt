@@ -1,6 +1,6 @@
 // 登录认证工具
 const app = getApp();
-const { post } = require('./request');
+const { post, get } = require('./request');
 
 function checkLogin() {
   const token = wx.getStorageSync('token');
@@ -14,34 +14,52 @@ function checkLogin() {
   return false;
 }
 
-function login(identifier, password) {
+function getCaptcha() {
+  return new Promise((resolve, reject) => {
+    get('/users/captcha', {}, { showLoading: false })
+      .then(res => {
+        if (res.code === 200 && res.data) {
+          resolve(res.data);
+        } else {
+          reject(new Error('获取验证码失败'));
+        }
+      })
+      .catch(err => {
+        reject(err);
+      });
+  });
+}
+
+function login(identifier, password, captchaId, captchaCode) {
   return new Promise((resolve, reject) => {
     console.log('🔑 尝试登录:', identifier);
 
-    post('/users/login', { identifier, password }, { showLoading: true })
+    const loginData = {
+      identifier,
+      password,
+      captcha_id: captchaId,
+      captcha_code: captchaCode
+    };
+
+    post('/users/login', loginData, { showLoading: true })
       .then(res => {
         console.log('✅ 登录成功:', res);
 
-        const { user_info, token } = res;
+        const { user_info, token } = res.data;
 
-        // 保存用户信息
         wx.setStorageSync('userInfo', user_info);
         wx.setStorageSync('token', token);
 
-        // 更新全局数据
         app.globalData.userInfo = user_info;
         app.globalData.token = token;
 
-        // 显示成功提示
         wx.showToast({
           title: '登录成功',
           icon: 'success',
           duration: 1500
         });
 
-        // 延迟跳转
         setTimeout(() => {
-          // 获取重定向地址
           const redirectUrl = wx.getStorageSync('loginRedirectUrl');
 
           if (redirectUrl) {
@@ -62,7 +80,42 @@ function login(identifier, password) {
 }
 
 function register(userData) {
-  return post('/users/register', userData);
+  return new Promise((resolve, reject) => {
+    console.log('📡 注册数据:', userData);
+
+    post('/users/register', userData, { showLoading: true })
+      .then(res => {
+        console.log('✅ 注册成功:', res);
+
+        const { user_info, token } = res.data;
+
+        // 保存用户信息
+        wx.setStorageSync('userInfo', user_info);
+        wx.setStorageSync('token', token);
+
+        // 更新全局数据
+        app.globalData.userInfo = user_info;
+        app.globalData.token = token;
+
+        // 显示成功提示
+        wx.showToast({
+          title: '注册成功',
+          icon: 'success',
+          duration: 1500
+        });
+
+        // 延迟跳转
+        setTimeout(() => {
+          wx.switchTab({ url: '/pages/index/index' });
+        }, 1500);
+
+        resolve(user_info);
+      })
+      .catch(err => {
+        console.error('❌ 注册失败:', err);
+        reject(err);
+      });
+  });
 }
 
 function logout() {
@@ -93,6 +146,7 @@ function hasRole(roles) {
 
 module.exports = {
   checkLogin,
+  getCaptcha,
   login,
   register,
   logout,

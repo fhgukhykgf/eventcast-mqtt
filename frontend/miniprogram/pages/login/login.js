@@ -6,8 +6,11 @@ Page({
     isLogin: true,
     loginForm: {
       identifier: '',
-      password: ''
+      password: '',
+      captchaCode: ''
     },
+    captchaId: '',
+    captchaImage: '',
     registerForm: {
       user_id: '',
       username: '',
@@ -15,7 +18,8 @@ Page({
       confirmPassword: '',
       real_name: '',
       email: '',
-      phone: ''
+      phone: '',
+      role: 'student'
     },
     loading: false,
     agreeProtocol: false,
@@ -25,7 +29,27 @@ Page({
   onLoad() {
     if (auth.checkLogin()) {
       wx.switchTab({ url: '/pages/index/index' });
+    } else {
+      this.loadCaptcha();
     }
+  },
+
+  async loadCaptcha() {
+    try {
+      const captchaData = await auth.getCaptcha();
+      console.log('验证码获取成功:', captchaData);
+      this.setData({
+        captchaId: captchaData.captcha_id,
+        captchaImage: captchaData.captcha_image
+      });
+    } catch (err) {
+      console.error('获取验证码失败:', err);
+    }
+  },
+
+  refreshCaptcha() {
+    this.setData({ 'loginForm.captchaCode': '' });
+    this.loadCaptcha();
   },
 
   // 切换模式
@@ -56,17 +80,18 @@ Page({
 
   // 协议勾选
   onAgreeChange(e) {
-    this.setData({ agreeProtocol: e.detail.value.length > 0 });
+    this.setData({ agreeProtocol: e.detail.value.includes('agree') });
   },
 
   // 验证登录表单
   validateLogin() {
-    const { identifier, password } = this.data.loginForm;
+    const { identifier, password, captchaCode } = this.data.loginForm;
     const errors = {};
 
     if (!identifier) errors.identifier = '请输入用户名';
     if (!password) errors.password = '请输入密码';
     else if (password.length < 6) errors.password = '密码至少6位';
+    if (!captchaCode) errors.captchaCode = '请输入验证码';
 
     this.setData({ errors });
     return Object.keys(errors).length === 0;
@@ -101,9 +126,16 @@ Page({
     this.setData({ loading: true });
 
     try {
-      await auth.login(this.data.loginForm.identifier, this.data.loginForm.password);
+      await auth.login(
+        this.data.loginForm.identifier,
+        this.data.loginForm.password,
+        this.data.captchaId,
+        this.data.loginForm.captchaCode
+      );
     } catch (err) {
       console.error('登录失败:', err);
+      // 登录失败刷新验证码
+      this.refreshCaptcha();
     } finally {
       this.setData({ loading: false });
     }
@@ -126,33 +158,10 @@ Page({
     }
   },
 
-  // 游客登录
-  onGuestLogin() {
-    wx.showModal({
-      title: '游客模式',
-      content: '游客模式只能浏览活动，无法报名和签到。确定继续？',
-      success: (res) => {
-        if (res.confirm) {
-          const guestInfo = {
-            user_id: 'guest',
-            user_name: '游客',
-            real_name: '游客',
-            role: 'guest'
-          };
-          wx.setStorageSync('userInfo', guestInfo);
-          wx.setStorageSync('token', 'guest-token');
-          getApp().globalData.userInfo = guestInfo;
-          getApp().globalData.token = 'guest-token';
-          wx.switchTab({ url: '/pages/index/index' });
-        }
-      }
-    });
-  },
-
   // 清除表单
   clearForm() {
     this.setData({
-      loginForm: { identifier: '', password: '' },
+      loginForm: { identifier: '', password: '', captchaCode: '' },
       registerForm: {
         user_id: '', username: '', password: '',
         confirmPassword: '', real_name: '', email: '', phone: ''

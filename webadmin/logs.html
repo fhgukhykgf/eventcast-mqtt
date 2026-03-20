@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日志管理 · 活动快传</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2rpx 8px rgba(0,0,0,0.06);
+        }
+        .tab {
+            flex: 1;
+            padding: 16px 24px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 500;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: #f5f5f5;
+        }
+        .tab.active {
+            color: #1890ff;
+            border-bottom-color: #1890ff;
+            background: #e6f7ff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .filter-bar select, .filter-bar input {
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .log-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .log-table th, .log-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .log-table th {
+            background: #fafafa;
+            font-weight: 600;
+            color: #333;
+        }
+        .log-table tr:hover {
+            background: #fafafa;
+        }
+        .log-action {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .log-action.create { background: #e6f7ff; color: #1890ff; }
+        .log-action.update { background: #fff7e6; color: #fa8c16; }
+        .log-action.delete { background: #fff1f0; color: #ff4d4f; }
+        .log-action.cancel { background: #fff2e8; color: #fa541c; }
+        .log-action.login { background: #f6ffed; color: #52c41a; }
+        .log-action.logout { background: #f5f5f5; color: #666; }
+        .status-badge.success { color: #52c41a; }
+        .status-badge.failed { color: #ff4d4f; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName"></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav"></div>
+    </div>
+
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" data-tab="operation">操作日志</div>
+            <div class="tab" data-tab="login">登录日志</div>
+        </div>
+
+        <!-- 操作日志 -->
+        <div class="tab-content active" id="operationTab">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">📝 操作日志</div>
+                </div>
+                <div class="filter-bar">
+                    <select id="opActionFilter" onchange="loadOperationLogs()">
+                        <option value="">全部操作</option>
+                        <option value="create">创建</option>
+                        <option value="update">更新</option>
+                        <option value="delete">删除</option>
+                        <option value="cancel">取消</option>
+                        <option value="login">登录</option>
+                    </select>
+                    <select id="opTargetFilter" onchange="loadOperationLogs()">
+                        <option value="">全部目标</option>
+                        <option value="event">活动</option>
+                        <option value="user">用户</option>
+                    </select>
+                    <input type="date" id="opStartDate" onchange="loadOperationLogs()">
+                    <input type="date" id="opEndDate" onchange="loadOperationLogs()">
+                    <button class="btn btn-primary" onclick="loadOperationLogs()">🔍 查询</button>
+                </div>
+                <div class="table-container">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">时间</th>
+                                <th style="width: 12%;">操作人</th>
+                                <th style="width: 10%;">操作类型</th>
+                                <th style="width: 10%;">目标类型</th>
+                                <th style="width: 20%;">目标名称</th>
+                                <th style="width: 20%;">详情</th>
+                                <th style="width: 13%;">来源</th>
+                            </tr>
+                        </thead>
+                        <tbody id="operationLogsList"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="opPagination"></div>
+            </div>
+        </div>
+
+        <!-- 登录日志 -->
+        <div class="tab-content" id="loginTab">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">🔑 登录日志</div>
+                </div>
+                <div class="filter-bar">
+                    <select id="loginSourceFilter" onchange="loadLoginLogs()">
+                        <option value="">全部来源</option>
+                        <option value="webadmin">后台管理</option>
+                        <option value="miniprogram">微信小程序</option>
+                    </select>
+                    <select id="loginStatusFilter" onchange="loadLoginLogs()">
+                        <option value="">全部状态</option>
+                        <option value="success">成功</option>
+                        <option value="failed">失败</option>
+                    </select>
+                    <input type="date" id="loginStartDate" onchange="loadLoginLogs()">
+                    <input type="date" id="loginEndDate" onchange="loadLoginLogs()">
+                    <button class="btn btn-primary" onclick="loadLoginLogs()">🔍 查询</button>
+                </div>
+                <div class="table-container">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">登录时间</th>
+                                <th style="width: 12%;">用户ID</th>
+                                <th style="width: 15%;">用户名</th>
+                                <th style="width: 12%;">来源</th>
+                                <th style="width: 10%;">状态</th>
+                                <th style="width: 18%;">IP地址</th>
+                                <th style="width: 18%;">失败原因</th>
+                            </tr>
+                        </thead>
+                        <tbody id="loginLogsList"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="loginPagination"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        const API_BASE = config.API_BASE;
+        let opCurrentPage = 1;
+        let loginCurrentPage = 1;
+        const pageSize = 20;
+
+        const actionMap = {
+            'create': '创建',
+            'update': '更新',
+            'delete': '删除',
+            'cancel': '取消',
+            'login': '登录',
+            'logout': '退出'
+        };
+
+        const targetMap = {
+            'event': '活动',
+            'user': '用户'
+        };
+
+        const sourceMap = {
+            'webadmin': '后台管理',
+            'miniprogram': '微信小程序'
+        };
+
+        // Tab 切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+            });
+        });
+
+        // 加载操作日志
+        async function loadOperationLogs() {
+            const action = document.getElementById('opActionFilter').value;
+            const target = document.getElementById('opTargetFilter').value;
+            const startDate = document.getElementById('opStartDate').value;
+            const endDate = document.getElementById('opEndDate').value;
+
+            const params = new URLSearchParams({
+                skip: (opCurrentPage - 1) * pageSize,
+                limit: pageSize
+            });
+            if (action) params.append('action', action);
+            if (target) params.append('target_type', target);
+            if (startDate) params.append('start_date', startDate + 'T00:00:00');
+            if (endDate) params.append('end_date', endDate + 'T23:59:59');
+
+            try {
+                const result = await api.get(`${API_BASE}/logs/operation?${params}`);
+                if (result && result.code === 200) {
+                    renderOperationLogs(result.data || []);
+                    renderOpPagination(result.total || 0);
+                }
+            } catch (err) {
+                Toast.error('加载操作日志失败');
+            }
+        }
+
+        // 渲染操作日志
+        function renderOperationLogs(logs) {
+            const tbody = document.getElementById('operationLogsList');
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#999;">暂无数据</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td style="font-size:12px;">${formatTime(log.created_at)}</td>
+                    <td>${log.user_name || '-'}</td>
+                    <td><span class="log-action ${log.action}">${actionMap[log.action] || log.action}</span></td>
+                    <td>${targetMap[log.target_type] || log.target_type || '-'}</td>
+                    <td>${log.target_name || '-'}</td>
+                    <td style="font-size:12px;">${log.detail || '-'}</td>
+                    <td>${sourceMap[log.source] || log.source}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 加载登录日志
+        async function loadLoginLogs() {
+            const source = document.getElementById('loginSourceFilter').value;
+            const status = document.getElementById('loginStatusFilter').value;
+            const startDate = document.getElementById('loginStartDate').value;
+            const endDate = document.getElementById('loginEndDate').value;
+
+            const params = new URLSearchParams({
+                skip: (loginCurrentPage - 1) * pageSize,
+                limit: pageSize
+            });
+            if (source) params.append('source', source);
+            if (status) params.append('status', status);
+            if (startDate) params.append('start_date', startDate + 'T00:00:00');
+            if (endDate) params.append('end_date', endDate + 'T23:59:59');
+
+            try {
+                const result = await api.get(`${API_BASE}/logs/login?${params}`);
+                if (result && result.code === 200) {
+                    renderLoginLogs(result.data || []);
+                    renderLoginPagination(result.total || 0);
+                }
+            } catch (err) {
+                Toast.error('加载登录日志失败');
+            }
+        }
+
+        // 渲染登录日志
+        function renderLoginLogs(logs) {
+            const tbody = document.getElementById('loginLogsList');
+            if (logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;color:#999;">暂无数据</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = logs.map(log => `
+                <tr>
+                    <td style="font-size:12px;">${formatTime(log.login_time)}</td>
+                    <td>${log.user_id || '-'}</td>
+                    <td>${log.user_name || '-'}</td>
+                    <td>${sourceMap[log.source] || log.source}</td>
+                    <td><span class="status-badge ${log.status}">${log.status === 'success' ? '成功' : '失败'}</span></td>
+                    <td>${log.ip_address || '-'}</td>
+                    <td style="color:#ff4d4f;font-size:12px;">${log.fail_reason || '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 分页
+        function renderOpPagination(total) {
+            renderPagination('opPagination', total, opCurrentPage, (page) => {
+                opCurrentPage = page;
+                loadOperationLogs();
+            });
+        }
+
+        function renderLoginPagination(total) {
+            renderPagination('loginPagination', total, loginCurrentPage, (page) => {
+                loginCurrentPage = page;
+                loadLoginLogs();
+            });
+        }
+
+        function renderPagination(elementId, total, currentPage, onPageChange) {
+            const totalPages = Math.ceil(total / pageSize);
+            const el = document.getElementById(elementId);
+            if (totalPages <= 1) {
+                el.innerHTML = `<div style="padding:16px;color:#999;font-size:13px;">共 ${total} 条记录</div>`;
+                return;
+            }
+
+            let html = `<div style="display:flex;justify-content:center;gap:8px;padding:16px;align-items:center;">`;
+            html += `<span style="color:#999;font-size:13px;">共 ${total} 条</span>`;
+            for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+                html += `<button class="btn ${i === currentPage ? 'btn-primary' : ''}" onclick="(${onPageChange.toString()})(${i})">${i}</button>`;
+            }
+            html += `</div>`;
+            el.innerHTML = html;
+        }
+
+        // 初始化
+        if (api.checkAuth()) {
+            // 检查管理员权限
+            if (!api.isAdmin()) {
+                Toast.error('您没有权限访问此页面');
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1500);
+            } else {
+                showUserName();
+                renderNav('logs');
+                loadOperationLogs();
+                loadLoginLogs();
+            }
+        }
+    </script>
+</body>
+</html>

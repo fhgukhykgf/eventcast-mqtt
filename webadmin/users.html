@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人员管理 · 活动快传</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 500px;
+            max-width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #333;
+        }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #1890ff;
+            outline: none;
+        }
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #f0f0f0;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        .status-active {
+            color: #52c41a;
+        }
+        .status-inactive {
+            color: #ff4d4f;
+        }
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-admin {
+            background: #fff7e6;
+            color: #fa8c16;
+        }
+        .status-organizer {
+            background: #e6f7ff;
+            color: #1890ff;
+        }
+        .status-student {
+            background: #f5f5f5;
+            color: #666;
+        }
+        .user-detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .detail-label {
+            font-size: 12px;
+            color: #999;
+        }
+        .detail-value {
+            font-size: 14px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-top">
+            <div class="logo">🎯 活动快传 · 管理后台</div>
+            <div class="user-info">
+                <span class="user-name" id="userName"></span>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
+        </div>
+        <div class="nav"></div>
+    </div>
+
+    <div class="container">
+        <div class="toolbar">
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索姓名/学号/用户名..." oninput="loadUsers()">
+                <select class="form-select" id="roleFilter" onchange="loadUsers()" style="width: 120px;">
+                    <option value="">全部角色</option>
+                    <option value="admin">管理员</option>
+                    <option value="organizer">组织者</option>
+                    <option value="student">学生</option>
+                </select>
+                <button class="btn btn-success" onclick="loadUsers()">🔄 刷新</button>
+                <button class="btn btn-primary" onclick="showAddModal()">➕ 新增用户</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">👥 用户列表</div>
+                <div id="statsInfo" style="font-size: 14px; color: #666;"></div>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>用户ID</th>
+                            <th>姓名</th>
+                            <th>角色</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersList"></tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- 新增/编辑弹窗 -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">新增用户</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="form-group">
+                        <label>用户ID *</label>
+                        <input type="text" id="formUserId" placeholder="如：20230001">
+                    </div>
+                    <div class="form-group">
+                        <label>用户名 *</label>
+                        <input type="text" id="formUsername" placeholder="登录用户名">
+                    </div>
+                    <div class="form-group">
+                        <label>真实姓名 *</label>
+                        <input type="text" id="formRealName" placeholder="用户真实姓名">
+                    </div>
+                    <div class="form-group">
+                        <label>密码 <span id="passwordHint" style="color:#999;font-weight:normal">(新增必填)</span></label>
+                        <input type="password" id="formPassword" placeholder="留空则不修改">
+                    </div>
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="text" id="formPhone" placeholder="11位手机号">
+                    </div>
+                    <div class="form-group">
+                        <label>邮箱</label>
+                        <input type="email" id="formEmail" placeholder="邮箱地址">
+                    </div>
+                    <div class="form-group">
+                        <label>角色 *</label>
+                        <select id="formRole">
+                            <option value="student">学生</option>
+                            <option value="organizer">组织者</option>
+                            <option value="admin">管理员</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveUser()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 用户详情弹窗 -->
+    <div class="modal" id="userDetailModal">
+        <div class="modal-content" style="width: 480px;">
+            <div class="modal-header">
+                <h3>👤 用户详情</h3>
+                <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="userDetailContent">
+                <!-- 动态填充 -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeDetailModal()">关闭</button>
+                <button class="btn btn-danger" id="deleteUserBtn" onclick="deleteCurrentUser()">删除用户</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="js/utils.js"></script>
+    <script>
+        const API_BASE = config.API_BASE;
+        let currentPage = 1;
+        const pageSize = 20;
+
+        const roleMap = {
+            'admin': '管理员',
+            'organizer': '组织者',
+            'student': '学生'
+        };
+
+        // 加载用户列表
+        async function loadUsers() {
+            const search = document.getElementById('searchInput').value.trim();
+            const role = document.getElementById('roleFilter').value;
+
+            try {
+                document.getElementById('usersList').innerHTML = `
+                    <tr><td colspan="5" style="text-align: center; padding: 40px;">加载中...</td></tr>
+                `;
+
+                const result = await api.get(`${API_BASE}/users/list`, {
+                    skip: (currentPage - 1) * pageSize,
+                    limit: pageSize,
+                    search: search,
+                    role: role
+                });
+
+                if (result && result.code === 200) {
+                    const users = result.data || [];
+                    const total = result.total || 0;
+
+                    // 统计信息
+                    document.getElementById('statsInfo').textContent = `共 ${total} 人`;
+
+                    if (users.length === 0) {
+                        document.getElementById('usersList').innerHTML = `
+                            <tr><td colspan="5" style="text-align: center; padding: 60px; color: #999;">
+                                <div style="font-size: 48px; margin-bottom: 16px;">👥</div>
+                                <div>暂无用户数据</div>
+                            </td></tr>
+                        `;
+                    } else {
+                        document.getElementById('usersList').innerHTML = users.map(u => `
+                            <tr>
+                                <td><strong>${u.user_id}</strong></td>
+                                <td>${u.real_name || u.username || '-'}</td>
+                                <td><span class="status-badge status-${u.role}">${roleMap[u.role] || u.role}</span></td>
+                                <td><span class="${u.status === 'active' ? 'status-active' : 'status-inactive'}">${u.status === 'active' ? '正常' : '已禁用'}</span></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="showUserDetail('${u.user_id}')">查看</button>
+                                    <button class="btn btn-sm" onclick="showEditModal('${u.user_id}')">编辑</button>
+                                    <button class="btn btn-sm ${u.status === 'active' ? '' : 'btn-success'}" onclick="toggleStatus('${u.user_id}')">
+                                        ${u.status === 'active' ? '禁用' : '启用'}
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
+
+                    renderPagination(total);
+                }
+            } catch (err) {
+                console.error('加载用户失败:', err);
+                document.getElementById('usersList').innerHTML = `
+                    <tr><td colspan="5" style="text-align: center; padding: 40px; color: #ff4d4f;">加载失败</td></tr>
+                `;
+            }
+        }
+
+        // 渲染分页
+        function renderPagination(total) {
+            const totalPages = Math.ceil(total / pageSize);
+            if (totalPages <= 1) {
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            let html = '<div style="display: flex; justify-content: center; gap: 8px; padding: 16px;">';
+            for (let i = 1; i <= Math.min(totalPages, 10); i++) {
+                html += `<button class="btn ${i === currentPage ? 'btn-primary' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+            html += '</div>';
+            document.getElementById('pagination').innerHTML = html;
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            loadUsers();
+        }
+
+        // 显示新增弹窗
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = '新增用户';
+            document.getElementById('editUserId').value = '';
+            document.getElementById('formUserId').value = '';
+            document.getElementById('formUserId').disabled = false;
+            document.getElementById('formUsername').value = '';
+            document.getElementById('formRealName').value = '';
+            document.getElementById('formPassword').value = '';
+            document.getElementById('formPhone').value = '';
+            document.getElementById('formEmail').value = '';
+            document.getElementById('formRole').value = 'student';
+            document.getElementById('passwordHint').textContent = '(必填)';
+            document.getElementById('userModal').classList.add('show');
+        }
+
+        // 显示编辑弹窗
+        async function showEditModal(userId) {
+            try {
+                const result = await api.get(`${API_BASE}/users/info/${userId}`);
+                if (result && result.code === 200) {
+                    const u = result.data;
+                    document.getElementById('modalTitle').textContent = '编辑用户';
+                    document.getElementById('editUserId').value = u.user_id;
+                    document.getElementById('formUserId').value = u.user_id;
+                    document.getElementById('formUserId').disabled = true;
+                    document.getElementById('formUsername').value = u.username || '';
+                    document.getElementById('formRealName').value = u.real_name || '';
+                    document.getElementById('formPassword').value = '';
+                    document.getElementById('formPhone').value = u.phone || '';
+                    document.getElementById('formEmail').value = u.email || '';
+                    document.getElementById('formRole').value = u.role || 'student';
+                    document.getElementById('passwordHint').textContent = '(留空则不修改)';
+                    document.getElementById('userModal').classList.add('show');
+                }
+            } catch (err) {
+                Toast.error('获取用户信息失败');
+            }
+        }
+
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('userModal').classList.remove('show');
+        }
+
+        // 当前查看的用户ID
+        let currentDetailUserId = null;
+
+        // 显示用户详情弹窗
+        async function showUserDetail(userId) {
+            currentDetailUserId = userId;
+            try {
+                const result = await api.get(`${API_BASE}/users/info/${userId}`);
+                if (result && result.code === 200) {
+                    const u = result.data;
+                    const statusMap = { 'active': '正常', 'inactive': '已禁用' };
+                    
+                    document.getElementById('userDetailContent').innerHTML = `
+                        <div class="user-detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">用户ID</span>
+                                <span class="detail-value">${u.user_id || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">用户名</span>
+                                <span class="detail-value">${u.username || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">真实姓名</span>
+                                <span class="detail-value">${u.real_name || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">手机号</span>
+                                <span class="detail-value">${u.phone || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">邮箱</span>
+                                <span class="detail-value">${u.email || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">角色</span>
+                                <span class="detail-value"><span class="status-badge status-${u.role}">${roleMap[u.role] || u.role}</span></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">状态</span>
+                                <span class="detail-value"><span class="${u.status === 'active' ? 'status-active' : 'status-inactive'}">${statusMap[u.status] || u.status}</span></span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">创建时间</span>
+                                <span class="detail-value">${formatTime(u.created_at)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">最后登录</span>
+                                <span class="detail-value">${u.last_login ? formatTime(u.last_login) : '从未登录'}</span>
+                            </div>
+                        </div>
+                    `;
+                    document.getElementById('userDetailModal').classList.add('show');
+                }
+            } catch (err) {
+                Toast.error('获取用户信息失败');
+            }
+        }
+
+        // 关闭详情弹窗
+        function closeDetailModal() {
+            document.getElementById('userDetailModal').classList.remove('show');
+            currentDetailUserId = null;
+        }
+
+        // 删除当前查看的用户
+        async function deleteCurrentUser() {
+            if (!currentDetailUserId) return;
+            
+            const confirmed = await showConfirm({
+                title: '删除用户',
+                message: '确定要删除该用户吗？此操作不可恢复！',
+                type: 'danger',
+                confirmText: '确认删除'
+            });
+            if (!confirmed) return;
+
+            try {
+                const result = await api.delete(`${API_BASE}/users/delete/${currentDetailUserId}`);
+                if (result && result.code === 200) {
+                    Toast.success('删除成功');
+                    closeDetailModal();
+                    loadUsers();
+                } else {
+                    Toast.error(result?.detail || '删除失败');
+                }
+            } catch (err) {
+                Toast.error('删除失败');
+            }
+        }
+
+        // 保存用户
+        async function saveUser() {
+            const editUserId = document.getElementById('editUserId').value;
+            const userId = document.getElementById('formUserId').value.trim();
+            const username = document.getElementById('formUsername').value.trim();
+            const realName = document.getElementById('formRealName').value.trim();
+            const password = document.getElementById('formPassword').value;
+            const phone = document.getElementById('formPhone').value.trim();
+            const email = document.getElementById('formEmail').value.trim();
+            const role = document.getElementById('formRole').value;
+
+            if (!userId || !username || !realName) {
+                Toast.warning('请填写必填项');
+                return;
+            }
+
+            if (!editUserId && !password) {
+                Toast.warning('新增用户必须设置密码');
+                return;
+            }
+
+            try {
+                if (editUserId) {
+                    // 编辑
+                    const updateData = {
+                        username: username,
+                        real_name: realName,
+                        phone: phone,
+                        email: email,
+                        role: role
+                    };
+                    if (password) {
+                        updateData.password = password;
+                    }
+                    const result = await api.put(`${API_BASE}/users/update/${editUserId}`, updateData);
+                    if (result && result.code === 200) {
+                        Toast.success('更新成功');
+                        closeModal();
+                        loadUsers();
+                    } else {
+                        Toast.error(result?.detail || '更新失败');
+                    }
+                } else {
+                    // 新增
+                    const result = await api.post(`${API_BASE}/users/create`, {
+                        user_id: userId,
+                        username: username,
+                        real_name: realName,
+                        password: password,
+                        phone: phone,
+                        email: email,
+                        role: role
+                    });
+                    if (result && result.code === 200) {
+                        Toast.success('创建成功');
+                        closeModal();
+                        loadUsers();
+                    } else {
+                        Toast.error(result?.detail || '创建失败');
+                    }
+                }
+            } catch (err) {
+                console.error('保存失败:', err);
+                Toast.error('操作失败');
+            }
+        }
+
+        // 切换状态
+        async function toggleStatus(userId) {
+            const confirmed = await showConfirm({
+                title: '切换用户状态',
+                message: '确定要切换该用户的状态吗？',
+                type: 'warning'
+            });
+            if (!confirmed) return;
+
+            try {
+                const result = await api.put(`${API_BASE}/users/toggle-status/${userId}`, {});
+                if (result && result.code === 200) {
+                    Toast.success('状态已更新');
+                    loadUsers();
+                } else {
+                    Toast.error(result?.detail || '操作失败');
+                }
+            } catch (err) {
+                Toast.error('操作失败');
+            }
+        }
+
+        // 删除用户
+        async function deleteUser(userId) {
+            const confirmed = await showConfirm({
+                title: '删除用户',
+                message: '确定要删除该用户吗？此操作不可恢复！',
+                type: 'danger',
+                confirmText: '确认删除'
+            });
+            if (!confirmed) return;
+
+            try {
+                const result = await api.delete(`${API_BASE}/users/delete/${userId}`);
+                if (result && result.code === 200) {
+                    Toast.success('删除成功');
+                    loadUsers();
+                } else {
+                    Toast.error(result?.detail || '删除失败');
+                }
+            } catch (err) {
+                Toast.error('删除失败');
+            }
+        }
+
+        // 初始化
+        if (api.checkAuth()) {
+            // 非管理员不能访问此页面
+            if (!api.isAdmin()) {
+                Toast.error('您没有权限访问此页面');
+                setTimeout(() => {
+                    window.location.href = 'dashboard.html';
+                }, 1500);
+            } else {
+                showUserName();
+                renderNav('users');
+                loadUsers();
+            }
+        }
+    </script>
+</body>
+</html>

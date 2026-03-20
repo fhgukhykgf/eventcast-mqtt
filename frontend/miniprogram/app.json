@@ -5,6 +5,7 @@
     "pages/events/events",
     "pages/event-detail/event-detail",
     "pages/signin/signin",
+    "pages/qrcode/qrcode",
     "pages/profile/profile"
   ],
   "window": {

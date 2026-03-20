@@ -2,17 +2,13 @@
 创建管理员账号
 """
 import asyncio
-import hashlib
 import sys
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from backend.utils.database import get_database
-
-
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+from utils.database import get_database
+from utils.auth import hash_password
 
 
 async def create_admin():

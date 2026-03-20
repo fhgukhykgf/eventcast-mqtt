@@ -99,6 +99,15 @@
   margin: 30rpx 0;
   font-size: 26rpx;
   color: #666;
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.agreement checkbox-group {
+  display: flex;
+  align-items: center;
+  margin-right: 10rpx;
 }
 
 .link {
@@ -154,4 +163,48 @@
 
 .other-btn::after {
   border: none;
+}
+
+.captcha-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.captcha-input {
+  flex: 1;
+  min-width: 0;
+  margin-right: 20rpx;
+}
+
+.captcha-image {
+  width: 180rpx;
+  height: 88rpx;
+  border: 2rpx solid #f0f0f0;
+  border-radius: 12rpx;
+}
+
+.captcha-placeholder {
+  width: 180rpx;
+  height: 88rpx;
+  border: 2rpx solid #1890ff;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e6f7ff;
+}
+
+.captcha-placeholder text {
+  font-size: 24rpx;
+  color: #1890ff;
+}
+
+.captcha-tip {
+  display: block;
+  font-size: 24rpx;
+  color: #1890ff;
+  text-align: right;
+  margin-top: -20rpx;
+  margin-bottom: 20rpx;
 }

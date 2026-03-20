@@ -4,28 +4,32 @@
   <view class="filter-bar">
     <view class="filter-item {{filterStatus === 'all' ? 'active' : ''}}"
           data-status="all" bindtap="onFilterChange">全部</view>
+    <view class="filter-item {{filterStatus === 'upcoming' ? 'active' : ''}}"
+          data-status="upcoming" bindtap="onFilterChange">未开始</view>
     <view class="filter-item {{filterStatus === 'active' ? 'active' : ''}}"
           data-status="active" bindtap="onFilterChange">进行中</view>
     <view class="filter-item {{filterStatus === 'ended' ? 'active' : ''}}"
           data-status="ended" bindtap="onFilterChange">已结束</view>
+    <view class="filter-item {{filterStatus === 'cancelled' ? 'active' : ''}}"
+          data-status="cancelled" bindtap="onFilterChange">已取消</view>
   </view>
 
 
   <!-- 活动列表 -->
   <view class="event-list" wx:if="{{events && events.length > 0}}">
     <block wx:for="{{events}}" wx:key="event_id" wx:for-item="item">
-      <view class="event-card" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+      <view class="event-card {{item.statusClass === 'cancelled' ? 'cancelled' : (item.statusClass === 'ended' ? 'ended' : '')}}" data-event-id="{{item.event_id}}" bindtap="onEventTap">
         <view class="event-header">
-          <text class="event-title">{{item.title || '无标题'}}</text>
-          <text class="event-status status-{{getEventStatus(item).class}}">
-            {{getEventStatus(item).text}}
+          <text class="event-title {{item.statusClass === 'cancelled' ? 'cancelled-title' : ''}}">{{item.title || '无标题'}}</text>
+          <text class="event-status status-{{item.statusClass}}">
+            {{item.statusText}}
           </text>
         </view>
         <view class="event-info">
-          <text class="event-time">🕒 {{formatTime(item.time)}}</text>
+          <text class="event-time">🕒 {{item.start_time || item.time || '时间待定'}} - {{item.end_time || item.time || item.start_time || '时间待定'}}</text>
           <text class="event-location">📍 {{item.location || '未知地点'}}</text>
         </view>
-        <view class="event-footer">
+        <view class="event-footer" wx:if="{{item.apply_count !== undefined}}">
           <text>报名 {{item.apply_count || 0}} 人</text>
           <text>签到 {{item.sign_count || 0}} 人</text>
           <text>签到率 {{item.sign_rate || '0%'}}</text>

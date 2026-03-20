@@ -1,50 +1,167 @@
 /* pages/event-detail/event-detail.wxss */
 .page {
   min-height: 100vh;
-  background: #f5f5f5;
-  padding: 20rpx;
+  background: linear-gradient(180deg, #f0f5ff 0%, #f5f7fa 100%);
+  padding: 24rpx;
+  padding-bottom: 200rpx;
+}
+
+/* 状态横幅 */
+.status-banner {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 28rpx;
+  border-radius: 20rpx;
+  margin-bottom: 24rpx;
+}
+
+.status-banner.active {
+  background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+  border: 2rpx solid #91d5ff;
+}
+
+.status-banner.ended {
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
+  border: 2rpx solid #ffd591;
+}
+
+.status-banner.cancelled {
+  background: linear-gradient(135deg, #fff1f0 0%, #ffccc7 100%);
+  border: 2rpx solid #ffa39e;
+}
+
+.banner-icon {
+  font-size: 48rpx;
+  margin-right: 20rpx;
+}
+
+.banner-content {
+  flex: 1;
+}
+
+.banner-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.status-banner.active .banner-title {
+  color: #1890ff;
+}
+
+.status-banner.ended .banner-title {
+  color: #fa8c16;
+}
+
+.status-banner.cancelled .banner-title {
+  color: #ff4d4f;
+}
+
+.banner-desc {
+  font-size: 24rpx;
+  color: #666;
 }
 
 .card {
   background: white;
-  border-radius: 16rpx;
-  padding: 30rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.04);
+  border-radius: 24rpx;
+  padding: 32rpx;
+  margin-bottom: 24rpx;
+  box-shadow: 0 4rpx 20rpx rgba(0, 0, 0, 0.04);
+}
+
+/* 活动卡片 */
+.event-card {
+  overflow: hidden;
+}
+
+.event-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 32rpx;
 }
 
 .title {
   font-size: 40rpx;
   font-weight: 700;
-  color: #333;
-  margin-bottom: 30rpx;
-  display: block;
+  color: #1a1a1a;
+  line-height: 1.4;
+  flex: 1;
+  padding-right: 20rpx;
+}
+
+.event-status {
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  flex-shrink: 0;
+}
+
+.event-status.active {
+  background: #e6f7ff;
+  color: #1890ff;
+}
+
+.event-status.ended {
+  background: #f5f5f5;
+  color: #999;
+}
+
+/* 信息列表 */
+.info-list {
+  margin-bottom: 24rpx;
 }
 
 .info-item {
   display: flex;
-  margin-bottom: 20rpx;
   align-items: flex-start;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #f5f5f5;
 }
 
-.label {
-  width: 140rpx;
-  font-size: 28rpx;
-  color: #999;
+.info-item:last-child {
+  border-bottom: none;
 }
 
-.value {
+.info-icon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+  width: 48rpx;
+  height: 48rpx;
+  background: #f0f5ff;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-content {
   flex: 1;
+}
+
+.info-label {
+  font-size: 24rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 6rpx;
+}
+
+.info-value {
   font-size: 28rpx;
   color: #333;
-  word-break: break-word;
+  line-height: 1.5;
 }
 
-.stats {
+/* 统计栏 */
+.stats-bar {
   display: flex;
-  margin-top: 30rpx;
-  padding-top: 30rpx;
-  border-top: 2rpx solid #f0f0f0;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 16rpx;
+  padding: 24rpx 0;
+  margin-top: 24rpx;
 }
 
 .stat-item {
@@ -53,129 +170,237 @@
 }
 
 .stat-value {
-  font-size: 40rpx;
+  font-size: 44rpx;
   font-weight: 700;
-  color: #1890ff;
+  color: #333;
   display: block;
-  margin-bottom: 8rpx;
+  line-height: 1;
+}
+
+.stat-value.highlight {
+  color: #1890ff;
 }
 
 .stat-label {
   font-size: 24rpx;
   color: #999;
-}
-
-.section-title {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 20rpx;
+  margin-top: 8rpx;
   display: block;
 }
 
+.stat-divider {
+  width: 1rpx;
+  height: 60rpx;
+  background: #e8e8e8;
+}
+
+/* 章节标题 */
+.section-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 24rpx;
+  display: block;
+}
+
+/* 活动描述 */
 .description {
   font-size: 28rpx;
   color: #666;
-  line-height: 1.6;
+  line-height: 1.8;
   white-space: pre-wrap;
+  word-break: break-all;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
-.status-item {
+/* 状态卡片 */
+.status-card {
+  background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%);
+}
+
+.status-row {
   display: flex;
-  justify-content: space-between;
-  padding: 20rpx 0;
-  border-bottom: 2rpx solid #f0f0f0;
+  align-items: center;
+  padding: 24rpx;
+  background: #f8fafc;
+  border-radius: 16rpx;
 }
 
-.status-item:last-child {
-  border-bottom: none;
+.status-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  margin-right: 24rpx;
 }
 
-.status-label {
-  font-size: 28rpx;
+.status-icon.pending {
+  background: #fff7e6;
+}
+
+.status-icon.applied {
+  background: #e6fffb;
+}
+
+.status-icon.signed {
+  background: #e6f7ff;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-title {
+  font-size: 32rpx;
+  font-weight: 600;
   color: #666;
+  display: block;
+  margin-bottom: 6rpx;
 }
 
-.status-value {
-  font-size: 28rpx;
-  font-weight: 500;
-}
-
-.status-value.applied {
+.status-title.success {
   color: #52c41a;
 }
 
-.status-value.signed {
-  color: #1890ff;
+.status-desc {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.status-desc.warning {
+  color: #fa8c16;
 }
 
 .status-time {
   font-size: 24rpx;
   color: #999;
-  margin-top: 10rpx;
-  text-align: right;
+  margin-top: 6rpx;
+  display: block;
 }
 
+.time-info {
+  display: flex;
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx dashed #e8e8e8;
+}
+
+.time-item {
+  flex: 1;
+  text-align: center;
+}
+
+.time-item:first-child {
+  border-right: 1rpx solid #e8e8e8;
+}
+
+.time-label {
+  font-size: 22rpx;
+  color: #999;
+  display: block;
+  margin-bottom: 8rpx;
+}
+
+.time-value {
+  font-size: 26rpx;
+  color: #333;
+  font-weight: 500;
+}
+
+/* 操作按钮 */
 .action-bar {
-  margin-top: 30rpx;
-  padding: 0 20rpx;
+  margin-top: 32rpx;
 }
 
 .btn {
   width: 100%;
-  height: 88rpx;
-  border-radius: 44rpx;
+  height: 96rpx;
+  border-radius: 48rpx;
   font-size: 32rpx;
-  font-weight: 500;
+  font-weight: 600;
   margin-bottom: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #1890ff, #096dd9);
-  color: white;
-}
-
-.btn-success {
-  background: #52c41a;
-  color: white;
-}
-
-.btn-warning {
-  background: #faad14;
-  color: white;
-}
-
-.btn-danger {
-  background: #ff4d4f;
-  color: white;
-}
-
-.btn-disabled {
-  background: #d9d9d9;
-  color: #999;
-  border: none;
-}
-
-.btn:active {
-  opacity: 0.8;
-  transform: scale(0.98);
+  letter-spacing: 2rpx;
 }
 
 .btn::after {
   border: none;
 }
 
+.btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  color: white;
+  box-shadow: 0 8rpx 24rpx rgba(24, 144, 255, 0.3);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
+  color: white;
+  box-shadow: 0 8rpx 24rpx rgba(82, 196, 26, 0.3);
+}
+
+.btn-outline {
+  background: white;
+  color: #faad14;
+  border: 2rpx solid #faad14;
+}
+
+.btn-danger {
+  background: white;
+  color: #ff4d4f;
+  border: 2rpx solid #ff4d4f;
+}
+
+.btn-disabled {
+  background: #f5f5f5;
+  color: #bfbfbf;
+}
+
+.ended-btn {
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
+  color: #fa8c16;
+}
+
+.signed-btn {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  color: #52c41a;
+}
+
+.cancelled-btn {
+  background: linear-gradient(135deg, #fff1f0 0%, #ffccc7 100%);
+  color: #ff4d4f;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon {
+  margin-right: 12rpx;
+}
+
+.btn:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+/* 加载状态 */
 .loading-mask {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255,255,255,0.9);
+  background: rgba(255, 255, 255, 0.95);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -184,15 +409,17 @@
 }
 
 .loading {
-  width: 60rpx;
-  height: 60rpx;
-  border: 4rpx solid #f0f0f0;
+  width: 64rpx;
+  height: 64rpx;
+  border: 4rpx solid #e8e8e8;
   border-top-color: #1890ff;
   border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 20rpx;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 24rpx;
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }

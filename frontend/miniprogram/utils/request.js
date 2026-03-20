@@ -32,21 +32,45 @@ function request(options) {
           wx.hideLoading();
         }
 
+        if (res.statusCode === 401) {
+          wx.showToast({
+            title: '登录已过期，请重新登录',
+            icon: 'none',
+            duration: 2000
+          });
+          
+          wx.clearStorageSync();
+          app.globalData.userInfo = null;
+          app.globalData.token = null;
+          
+          setTimeout(() => {
+            wx.reLaunch({ url: '/pages/login/login' });
+          }, 1500);
+          
+          reject(new Error('Unauthorized'));
+          return;
+        }
+
         if (res.statusCode === 200) {
-          // 统一处理响应格式
           if (res.data && res.data.code === 200) {
-            // 标准格式：{code:200, data: ...}
             resolve(res.data);
           } else if (Array.isArray(res.data)) {
-            // 如果直接返回数组，包装成标准格式
             resolve({ code: 200, data: res.data });
           } else {
-            // 其他情况，直接返回
             resolve(res.data);
           }
+        } else if (res.statusCode === 403) {
+          wx.showToast({
+            title: res.data?.detail || '权限不足',
+            icon: 'none'
+          });
+          reject(new Error('Forbidden'));
+        } else if (res.statusCode === 404) {
+          // 404 不显示 toast，让调用方处理
+          resolve({ code: 404, data: null, detail: res.data?.detail || '资源不存在' });
         } else {
           wx.showToast({
-            title: `HTTP ${res.statusCode}`,
+            title: res.data?.detail || `请求失败 (${res.statusCode})`,
             icon: 'none'
           });
           reject(new Error(`HTTP ${res.statusCode}`));
@@ -75,8 +99,6 @@ function request(options) {
     });
   });
 }
-
-
 
 function get(url, data = {}, options = {}) {
   return request({ url, method: 'GET', data, ...options });

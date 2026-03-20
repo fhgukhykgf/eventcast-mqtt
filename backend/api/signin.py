@@ -1,11 +1,14 @@
 """
 签到管理接口
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from datetime import datetime
 import logging
+from typing import Dict, Any, Optional
+
 from utils.database import get_database
 from utils.mqtt_client import publish_message, is_mqtt_connected
+from utils.auth import get_current_user, TokenData
 from models.signin import ApplyRequest, SignInRequest
 
 router = APIRouter()
@@ -13,14 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/apply")
-async def apply_event(apply_data: ApplyRequest):
-    """报名活动"""
+async def apply_event(apply_data: ApplyRequest, current_user: TokenData = Depends(get_current_user)):
+    """报名活动（需登录）"""
     try:
         db = await get_database()
         events = db["events"]
         applies = db["user_apply"]
 
-        # 检查活动
         event = await events.find_one({"event_id": apply_data.event_id})
         if not event:
             raise HTTPException(status_code=404, detail="活动不存在")
@@ -28,7 +30,6 @@ async def apply_event(apply_data: ApplyRequest):
         if event["status"] != "active":
             raise HTTPException(status_code=400, detail="活动已结束")
 
-        # 检查是否已报名
         existing = await applies.find_one({
             "event_id": apply_data.event_id,
             "user_id": apply_data.user_id
@@ -36,11 +37,9 @@ async def apply_event(apply_data: ApplyRequest):
         if existing:
             raise HTTPException(status_code=400, detail="已报名")
 
-        # 检查人数限制
         if event.get("limit_num") and event["apply_count"] >= event["limit_num"]:
             raise HTTPException(status_code=400, detail="报名人数已满")
 
-        # 创建报名记录
         apply_record = {
             "event_id": apply_data.event_id,
             "user_id": apply_data.user_id,
@@ -51,13 +50,11 @@ async def apply_event(apply_data: ApplyRequest):
 
         await applies.insert_one(apply_record)
 
-        # 更新活动报名数
         await events.update_one(
             {"event_id": apply_data.event_id},
             {"$inc": {"apply_count": 1}}
         )
 
-        # 发送MQTT通知
         try:
             if is_mqtt_connected():
                 publish_message(f"event/{apply_data.event_id}/notice", {
@@ -80,14 +77,13 @@ async def apply_event(apply_data: ApplyRequest):
 
 
 @router.post("/cancel")
-async def cancel_apply(apply_data: ApplyRequest):
-    """取消报名"""
+async def cancel_apply(apply_data: ApplyRequest, current_user: TokenData = Depends(get_current_user)):
+    """取消报名（需登录）"""
     try:
         db = await get_database()
         events = db["events"]
         applies = db["user_apply"]
 
-        # 删除报名记录
         result = await applies.delete_one({
             "event_id": apply_data.event_id,
             "user_id": apply_data.user_id
@@ -96,7 +92,6 @@ async def cancel_apply(apply_data: ApplyRequest):
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="报名记录不存在")
 
-        # 更新活动报名数
         await events.update_one(
             {"event_id": apply_data.event_id},
             {"$inc": {"apply_count": -1}}
@@ -113,20 +108,18 @@ async def cancel_apply(apply_data: ApplyRequest):
 
 
 @router.post("/in")
-async def sign_in(sign_data: SignInRequest):
-    """签到"""
+async def sign_in(sign_data: SignInRequest, current_user: TokenData = Depends(get_current_user)):
+    """签到（需登录）"""
     try:
         db = await get_database()
         events = db["events"]
         applies = db["user_apply"]
         signs = db["sign_records"]
 
-        # 检查活动
         event = await events.find_one({"event_id": sign_data.event_id})
         if not event:
             raise HTTPException(status_code=404, detail="活动不存在")
 
-        # 检查是否报名
         apply = await applies.find_one({
             "event_id": sign_data.event_id,
             "user_id": sign_data.user_id
@@ -134,7 +127,6 @@ async def sign_in(sign_data: SignInRequest):
         if not apply:
             raise HTTPException(status_code=400, detail="请先报名")
 
-        # 检查是否已签到
         existing = await signs.find_one({
             "event_id": sign_data.event_id,
             "user_id": sign_data.user_id
@@ -142,7 +134,6 @@ async def sign_in(sign_data: SignInRequest):
         if existing:
             raise HTTPException(status_code=400, detail="已签到")
 
-        # 创建签到记录
         sign_record = {
             "event_id": sign_data.event_id,
             "user_id": sign_data.user_id,
@@ -153,18 +144,15 @@ async def sign_in(sign_data: SignInRequest):
 
         await signs.insert_one(sign_record)
 
-        # 更新活动签到数
         await events.update_one(
             {"event_id": sign_data.event_id},
             {"$inc": {"sign_count": 1}}
         )
 
-        # 计算实时签到率
         sign_rate = 0
         if event["apply_count"] > 0:
             sign_rate = round((event["sign_count"] + 1) / event["apply_count"] * 100, 2)
 
-        # 发送MQTT通知
         try:
             if is_mqtt_connected():
                 publish_message(f"event/{sign_data.event_id}/sign_in", {
@@ -194,18 +182,16 @@ async def sign_in(sign_data: SignInRequest):
 
 
 @router.get("/status/{event_id}/{user_id}")
-async def get_sign_status(event_id: str, user_id: str):
-    """获取签到状态"""
+async def get_sign_status(event_id: str, user_id: str, current_user: TokenData = Depends(get_current_user)):
+    """获取签到状态（需登录）"""
     try:
         db = await get_database()
 
-        # 检查报名
         apply = await db["user_apply"].find_one({
             "event_id": event_id,
             "user_id": user_id
         })
 
-        # 检查签到
         sign = await db["sign_records"].find_one({
             "event_id": event_id,
             "user_id": user_id
@@ -227,8 +213,8 @@ async def get_sign_status(event_id: str, user_id: str):
 
 
 @router.get("/records/{event_id}")
-async def get_sign_records(event_id: str, skip: int = 0, limit: int = 50):
-    """获取活动签到记录"""
+async def get_sign_records(event_id: str, skip: int = 0, limit: int = 50, current_user: TokenData = Depends(get_current_user)):
+    """获取活动签到记录（需登录）"""
     try:
         db = await get_database()
 
@@ -258,7 +244,7 @@ async def get_sign_records(event_id: str, skip: int = 0, limit: int = 50):
 
 @router.get("/count/{event_id}")
 async def get_sign_count(event_id: str):
-    """获取签到计数"""
+    """获取签到计数（公开接口）"""
     try:
         db = await get_database()
 
@@ -287,43 +273,55 @@ async def get_sign_count(event_id: str):
 
 
 @router.get("/user/{user_id}")
-async def get_user_sign_records(user_id: str, skip: int = 0, limit: int = 20):
+async def get_user_sign_records(user_id: str, skip: int = 0, limit: int = 20, current_user: TokenData = Depends(get_current_user)):
     """
-    获取用户的活动记录（包括报名和签到）
+    获取用户的活动记录（需登录）
     """
     try:
         db = await get_database()
 
-        # 获取用户的报名记录
         applies = await db["user_apply"].find(
             {"user_id": user_id}
         ).sort("apply_time", -1).skip(skip).limit(limit).to_list(length=limit)
 
-        # 获取用户的签到记录
         signs = await db["sign_records"].find(
             {"user_id": user_id}
         ).to_list(length=None)
 
-        # 创建签到记录映射
         sign_map = {s["event_id"]: s for s in signs}
 
-        # 获取活动详情
         result = []
         for apply in applies:
             event = await db["events"].find_one({"event_id": apply["event_id"]})
             if event:
                 sign_record = sign_map.get(apply["event_id"])
+                
+                # 计算活动状态
+                event_status = event.get("status", "active")
+                if event_status != "cancelled":
+                    now = datetime.now()
+                    end_time_str = event.get("end_time") or event.get("time")
+                    if end_time_str:
+                        try:
+                            end_time = datetime.fromisoformat(end_time_str.replace('Z', '+00:00').replace(' ', 'T'))
+                            if now > end_time:
+                                event_status = "ended"
+                        except:
+                            pass
+                
                 result.append({
                     "event_id": apply["event_id"],
                     "event_title": event.get("title", ""),
                     "event_time": event.get("time", ""),
+                    "event_start_time": event.get("start_time", ""),
+                    "event_end_time": event.get("end_time", ""),
                     "event_location": event.get("location", ""),
+                    "event_status": event_status,
                     "apply_time": apply.get("apply_time", ""),
                     "sign_time": sign_record.get("sign_time") if sign_record else None,
                     "status": "signed" if sign_record else "applied"
                 })
 
-        # 获取总数
         total = await db["user_apply"].count_documents({"user_id": user_id})
 
         return {
@@ -334,4 +332,52 @@ async def get_user_sign_records(user_id: str, skip: int = 0, limit: int = 20):
 
     except Exception as e:
         logger.error(f"获取用户活动记录失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/all/{event_id}")
+async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, search: Optional[str] = None, current_user: TokenData = Depends(get_current_user)):
+    """
+    获取活动的所有报名人员（需登录）
+    """
+    try:
+        db = await get_database()
+
+        query: Dict[str, Any] = {"event_id": event_id}
+        if search:
+            query["$or"] = [
+                {"user_name": {"$regex": search, "$options": "i"}},
+                {"user_id": {"$regex": search, "$options": "i"}}
+            ]
+
+        total = await db["user_apply"].count_documents(query)
+
+        cursor = db["user_apply"].find(query).sort("apply_time", -1).skip(skip).limit(limit)
+        applies = await cursor.to_list(length=limit)
+
+        signs = await db["sign_records"].find(
+            {"event_id": event_id}
+        ).to_list(length=None)
+
+        sign_map = {s["user_id"]: s for s in signs}
+
+        result = []
+        for apply in applies:
+            sign_record = sign_map.get(apply["user_id"])
+            result.append({
+                "user_id": apply["user_id"],
+                "user_name": apply["user_name"],
+                "apply_time": apply["apply_time"],
+                "sign_time": sign_record.get("sign_time") if sign_record else None,
+                "status": "signed" if sign_record else "applied"
+            })
+
+        return {
+            "code": 200,
+            "data": result,
+            "total": total
+        }
+
+    except Exception as e:
+        logger.error(f"获取报名人员失败: {e}")
         raise HTTPException(status_code=500, detail=str(e))

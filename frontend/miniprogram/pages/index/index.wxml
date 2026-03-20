@@ -12,6 +12,11 @@
             userInfo.role === 'admin' ? '管理员' : '游客'}}
         </text>
       </view>
+      <!-- 通知入口 -->
+      <view class="notification-btn" bindtap="onNotificationTap">
+        <text class="notification-icon">🔔</text>
+        <view class="notification-badge" wx:if="{{unreadCount > 0}}">{{unreadCount > 99 ? '99+' : unreadCount}}</view>
+      </view>
     </view>
 
     <!-- 统计数据 -->
@@ -43,44 +48,67 @@
     </view>
   </view>
 
+  <!-- 进行中的活动 -->
+  <view class="section" wx:if="{{ongoingEvents && ongoingEvents.length > 0}}">
+    <view class="section-header">
+      <text class="section-title" style="color: #52c41a;">🔥 进行中</text>
+      <text class="section-more" bindtap="onViewAllEvents">查看更多 ></text>
+    </view>
+    <view class="event-list">
+      <block wx:for="{{ongoingEvents}}" wx:key="event_id" wx:for-item="item">
+        <view class="event-item ongoing" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+          <view class="event-main">
+            <text class="event-title">{{item.title || '无标题'}}</text>
+            <text class="event-time">🕒 {{item.start_time || item.time || '时间待定'}} - {{item.end_time || '时间待定'}}</text>
+            <text class="event-location">📍 {{item.location || '未知地点'}}</text>
+          </view>
+          <view class="event-badge ongoing">进行中</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
   <!-- 即将开始的活动 -->
   <view class="section" wx:if="{{upcomingEvents && upcomingEvents.length > 0}}">
     <view class="section-header">
-      <text class="section-title">即将开始</text>
+      <text class="section-title">⏰ 即将开始</text>
       <text class="section-more" bindtap="onViewAllEvents">查看更多 ></text>
     </view>
     <view class="event-list">
       <block wx:for="{{upcomingEvents}}" wx:key="event_id" wx:for-item="item">
-        <view class="event-item" data-event-id="{{item.event_id}}" bindtap="onEventTap">
-          <text class="event-title">{{item.title || '无标题'}}</text>
-          <text class="event-time">🕒 {{formatTime(item.time)}}</text>
-          <text class="event-location">📍 {{item.location || '未知地点'}}</text>
+        <view class="event-item upcoming" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+          <view class="event-main">
+            <text class="event-title">{{item.title || '无标题'}}</text>
+            <text class="event-time">🕒 {{item.start_time || item.time || '时间待定'}} - {{item.end_time || '时间待定'}}</text>
+            <text class="event-location">📍 {{item.location || '未知地点'}}</text>
+          </view>
+          <view class="event-badge upcoming">待开始</view>
         </view>
       </block>
     </view>
   </view>
 
   <!-- 最近参与的活动 -->
-<!-- 在“最近参与”部分修改状态显示 -->
-<view class="section" wx:if="{{recentEvents && recentEvents.length > 0}}">
-  <view class="section-header">
-    <text class="section-title">最近参与</text>
-  </view>
-  <view class="event-list">
-    <block wx:for="{{recentEvents}}" wx:key="event_id" wx:for-item="item">
-      <view class="event-item" data-event-id="{{item.event_id}}" bindtap="onEventTap">
-        <view class="event-info">
-          <text class="event-title">{{item.event_title || item.title}}</text>
-          <text class="event-time">🕒 {{formatTime(item.event_time || item.time)}}</text>
-          <text class="event-location">📍 {{item.event_location || item.location}}</text>
+  <view class="section" wx:if="{{recentEvents && recentEvents.length > 0}}">
+    <view class="section-header">
+      <text class="section-title">📝 最近参与</text>
+    </view>
+    <view class="event-list">
+      <block wx:for="{{recentEvents}}" wx:key="event_id" wx:for-item="item">
+        <view class="event-item {{item.statusClass}}" data-event-id="{{item.event_id}}" bindtap="onEventTap">
+          <view class="event-info">
+            <text class="event-title {{item.statusClass === 'cancelled' ? 'cancelled-text' : ''}}">{{item.event_title || item.title}}</text>
+            <text class="event-time">🕒 {{item.event_time || item.start_time || item.time || '时间待定'}}</text>
+            <text class="event-location">📍 {{item.event_location || item.location || '未知地点'}}</text>
+          </view>
+          <text class="event-status {{item.statusClass}}">
+            {{item.statusText}}
+          </text>
         </view>
-        <text class="event-status {{getEventStatusClass(item)}}">
-          {{getEventStatusText(item)}}
-        </text>
-      </view>
-    </block>
+      </block>
+    </view>
   </view>
-</view>
+
   <!-- 加载中 -->
   <view class="loading-mask" wx:if="{{loading}}">
     <view class="loading"></view>
@@ -88,10 +116,9 @@
   </view>
 
   <!-- 空状态 -->
-  <view class="empty-state" wx:elif="{{(!upcomingEvents || upcomingEvents.length === 0) && (!recentEvents || recentEvents.length === 0)}}">
-    <image class="empty-icon" src="/images/empty-events.png"></image>
+  <view class="empty-state" wx:elif="{{(!ongoingEvents || ongoingEvents.length === 0) && (!upcomingEvents || upcomingEvents.length === 0) && (!recentEvents || recentEvents.length === 0)}}">
+    <text class="empty-icon">📭</text>
     <text class="empty-text">暂无活动数据</text>
+    <text class="empty-hint">快去参加活动吧~</text>
   </view>
-
-
 </view>
