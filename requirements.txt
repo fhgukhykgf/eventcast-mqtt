@@ -23,6 +23,4 @@ python-dotenv==1.0.0
 requests==2.31.0
 python-multipart==0.0.6
 
-# 开发依赖（可选）
-pytest==7.4.3
-pytest-asyncio==0.21.1
+
