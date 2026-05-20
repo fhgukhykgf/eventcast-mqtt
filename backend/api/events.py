@@ -263,6 +263,9 @@ async def update_event(event_id: str, event_update: EventUpdate, current_user: T
             if result.modified_count > 0:
                 logger.info(f"✅ 活动更新成功: {event_id}")
 
+                # 获取更新后的标题，如果未提供则使用旧标题
+                updated_title = update_data.get("title", event.get("title"))
+
                 # 记录操作日志
                 await log_operation(
                     log_type="operation",
@@ -271,8 +274,8 @@ async def update_event(event_id: str, event_update: EventUpdate, current_user: T
                     action="update",
                     target_type="event",
                     target_id=event_id,
-                    target_name=event.get("title"),
-                    detail=f"更新活动: {event.get('title')}",
+                    target_name=updated_title,
+                    detail=f"更新活动: {updated_title}",
                     source="webadmin"
                 )
 
