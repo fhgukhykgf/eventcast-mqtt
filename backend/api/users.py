@@ -452,8 +452,11 @@ async def admin_update_user(user_id: str, user: UserUpdate, current_user: TokenD
 
         update_data = user.dict(exclude_unset=True)
         
-        if "password" in update_data and update_data["password"]:
-            update_data["password"] = hash_password(update_data["password"])
+        if "password" in update_data:
+            if update_data["password"]:
+                update_data["password"] = hash_password(update_data["password"])
+            else:
+                del update_data["password"]
         
         update_data["updated_at"] = datetime.now().isoformat()
 
@@ -472,8 +475,8 @@ async def admin_update_user(user_id: str, user: UserUpdate, current_user: TokenD
             action="update",
             target_type="user",
             target_id=user_id,
-            target_name=existing.get("real_name", user_id),
-            detail=f"更新用户: {existing.get('username')}",
+            target_name=update_data.get("real_name", existing.get("real_name", user_id)),
+            detail=f"更新用户: {update_data.get('username', existing.get('username'))}",
             source="webadmin"
         )
 

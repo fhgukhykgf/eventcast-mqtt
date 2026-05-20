@@ -5,8 +5,8 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 
 # 数据库
-pymongo==4.6.0
-motor==3.7.1
+pymongo>=4.6.0,<5.0.0
+motor>=3.3.0,<4.0.0
 
 # MQTT客户端
 paho-mqtt==2.1.0

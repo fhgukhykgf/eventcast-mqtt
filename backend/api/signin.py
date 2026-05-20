@@ -37,9 +37,6 @@ async def apply_event(apply_data: ApplyRequest, current_user: TokenData = Depend
         if existing:
             raise HTTPException(status_code=400, detail="已报名")
 
-        if event.get("limit_num") and event["apply_count"] >= event["limit_num"]:
-            raise HTTPException(status_code=400, detail="报名人数已满")
-
         apply_record = {
             "event_id": apply_data.event_id,
             "user_id": apply_data.user_id,
@@ -48,12 +45,31 @@ async def apply_event(apply_data: ApplyRequest, current_user: TokenData = Depend
             "status": "applied"
         }
 
-        await applies.insert_one(apply_record)
+        try:
+            await applies.insert_one(apply_record)
+        except Exception as e:
+            if "duplicate key error" in str(e).lower() or "e11000" in str(e).lower():
+                raise HTTPException(status_code=400, detail="已报名")
+            raise HTTPException(status_code=500, detail=str(e))
 
-        await events.update_one(
-            {"event_id": apply_data.event_id},
-            {"$inc": {"apply_count": 1}}
-        )
+        # 安全地递增报名人数（避免并发超卖）
+        if event.get("limit_num"):
+            result = await events.update_one(
+                {
+                    "event_id": apply_data.event_id,
+                    "apply_count": {"$lt": event["limit_num"]}
+                },
+                {"$inc": {"apply_count": 1}}
+            )
+            if result.modified_count == 0:
+                # 回滚报名记录
+                await applies.delete_one({"_id": apply_record.get("_id")})
+                raise HTTPException(status_code=400, detail="报名人数已满")
+        else:
+            await events.update_one(
+                {"event_id": apply_data.event_id},
+                {"$inc": {"apply_count": 1}}
+            )
 
         try:
             if is_mqtt_connected():
@@ -142,7 +158,12 @@ async def sign_in(sign_data: SignInRequest, current_user: TokenData = Depends(ge
             "sign_method": sign_data.sign_method or "scan"
         }
 
-        await signs.insert_one(sign_record)
+        try:
+            await signs.insert_one(sign_record)
+        except Exception as e:
+            if "duplicate key error" in str(e).lower() or "e11000" in str(e).lower():
+                raise HTTPException(status_code=400, detail="已签到")
+            raise HTTPException(status_code=500, detail=str(e))
 
         await events.update_one(
             {"event_id": sign_data.event_id},

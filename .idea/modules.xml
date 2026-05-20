@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/eventcast-mqtt.iml" filepath="$PROJECT_DIR$/.idea/eventcast-mqtt.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../weixin_assistant/.idea/weixin_assistant.iml" filepath="$PROJECT_DIR$/../weixin_assistant/.idea/weixin_assistant.iml" />
     </modules>
   </component>
 </project>

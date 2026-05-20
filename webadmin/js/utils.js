@@ -53,10 +53,13 @@ const api = {
                 setTimeout(() => {
                     window.location.href = 'index.html';
                 }, 1500);
-                return null;
+                throw new Error('Unauthorized');
             }
             
             const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || data.msg || `请求失败 (${response.status})`);
+            }
             return data;
         } catch (err) {
             console.error('请求失败:', err);
