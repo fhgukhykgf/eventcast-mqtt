@@ -29,7 +29,6 @@ URL: /events/create
 方法: POST
 
 权限: 组织者/管理员
-
 请求参数:
 {
     "event_id": "lecture_001",        // 活动ID，唯一标识
