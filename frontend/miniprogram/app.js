@@ -3,7 +3,7 @@ const mqttManager = require('./utils/mqtt.js');
 
 App({
   globalData: {
-    baseUrl: 'http://192.168.115.4:8000/api',
+    baseUrl: 'http://192.168.120.65:8000/api',
     mqttWsUrl: 'ws://192.168.1.64:8083/mqtt',
     userInfo: null,
     token: null

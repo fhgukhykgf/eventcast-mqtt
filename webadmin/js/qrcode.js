@@ -1,68 +1,48 @@
 var QRCode = (function() {
     var QRCode = {};
     
-    QRCode.draw = function(text, canvasId, page, callback) {
-        var query = wx.createSelectorQuery().in(page);
-        query.select('#' + canvasId)
-          .fields({ node: true, size: true })
-          .exec(function(res) {
-            if (res && res[0] && res[0].node) {
-              QRCode.drawCanvas2D(res[0], text, callback);
-            } else {
-              QRCode.drawOldAPI(text, canvasId, page, callback);
-            }
-          });
-    };
-    
-    QRCode.drawCanvas2D = function(canvasRes, text, callback) {
-        var canvas = canvasRes.node;
-        var ctx = canvas.getContext('2d');
-        var dpr = wx.getSystemInfoSync().pixelRatio || 2;
-        var width = 280;
-        var height = 280;
-        
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
-        ctx.scale(dpr, dpr);
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, width, height);
-        
-        var modules = QRCode.createQRCode(text);
-        var moduleSize = width / modules.length;
-        
-        ctx.fillStyle = '#000000';
-        for (var y = 0; y < modules.length; y++) {
-            for (var x = 0; x < modules[y].length; x++) {
-                if (modules[y][x]) {
-                    ctx.fillRect(x * moduleSize, y * moduleSize, moduleSize, moduleSize);
-                }
-            }
+    QRCode.toCanvas = function(canvas, text, options, callback) {
+        if (typeof options === 'function') {
+            callback = options;
+            options = {};
         }
         
-        if (callback) setTimeout(callback, 50);
-    };
-    
-    QRCode.drawOldAPI = function(text, canvasId, page, callback) {
-        var ctx = wx.createCanvasContext(canvasId, page);
-        var size = 280;
+        options = options || {};
+        var width = options.width || 256;
+        var margin = options.margin || 4;
+        var color = options.color || { dark: '#000000', light: '#ffffff' };
         
-        ctx.setFillStyle('#FFFFFF');
-        ctx.fillRect(0, 0, size, size);
-        
-        var modules = QRCode.createQRCode(text);
-        var moduleSize = size / modules.length;
-        
-        ctx.setFillStyle('#000000');
-        for (var y = 0; y < modules.length; y++) {
-            for (var x = 0; x < modules[y].length; x++) {
-                if (modules[y][x]) {
-                    ctx.fillRect(x * moduleSize, y * moduleSize, moduleSize, moduleSize);
+        try {
+            var modules = QRCode.createQRCode(text);
+            var moduleCount = modules.length;
+            var totalSize = moduleCount + margin * 2;
+            var scale = width / totalSize;
+            
+            canvas.width = width;
+            canvas.height = width;
+            
+            var ctx = canvas.getContext('2d');
+            ctx.fillStyle = color.light;
+            ctx.fillRect(0, 0, width, width);
+            
+            ctx.fillStyle = color.dark;
+            for (var y = 0; y < moduleCount; y++) {
+                for (var x = 0; x < moduleCount; x++) {
+                    if (modules[y][x]) {
+                        ctx.fillRect(
+                            (x + margin) * scale,
+                            (y + margin) * scale,
+                            scale,
+                            scale
+                        );
+                    }
                 }
             }
+            
+            callback(null, canvas);
+        } catch (err) {
+            callback(err);
         }
-        
-        ctx.draw(false, function() { if (callback) setTimeout(callback, 100); });
     };
     
     var gfExp = [];
@@ -100,20 +80,6 @@ var QRCode = (function() {
             for (var j = 0; j < b.length; j++) {
                 result[i + j] ^= gfMul(a[i], b[j]);
             }
-        }
-        return result;
-    }
-    
-    function gfPolyMod(dividend, divisor) {
-        var result = dividend.slice();
-        while (result.length >= divisor.length) {
-            var coef = result[0];
-            if (coef !== 0) {
-                for (var i = 0; i < divisor.length; i++) {
-                    result[i] ^= gfMul(divisor[i], coef);
-                }
-            }
-            result.shift();
         }
         return result;
     }
@@ -279,4 +245,6 @@ var QRCode = (function() {
     return QRCode;
 })();
 
-module.exports = QRCode;
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = QRCode;
+}

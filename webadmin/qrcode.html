@@ -18,7 +18,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .error-message { color: #ff4d4f; background: #fff1f0; padding: 10px; border-radius: 4px; margin: 10px 0; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="js/qrcode.js"></script>
 </head>
 <body>
     <div class="header">
@@ -170,6 +170,8 @@
                     `;
 
                     document.getElementById('generateBtn').disabled = false;
+
+                    generateQRCode();
                 } else {
                     showError('获取活动详情失败：' + (result?.msg || '未知错误'));
                 }
@@ -186,28 +188,14 @@
 
             hideError();
 
-            // 生成二维码内容（JSON格式）
-            const timestamp = Date.now();
-            const validUntil = timestamp + 30 * 60 * 1000; // 30分钟有效
+            const qrString = currentEvent.event_id;
+            console.log('📊 二维码数据:', qrString);
 
-            const qrData = {
-                type: 'event_sign',
-                event_id: currentEvent.event_id,
-                event_title: currentEvent.title,
-                timestamp: timestamp,
-                valid_until: validUntil
-            };
-
-            const qrString = JSON.stringify(qrData);
-            console.log('📊 二维码数据:', qrData);
-
-            // 清空之前的二维码
             document.getElementById('qrcode').innerHTML = '';
 
-            // 生成新二维码
             QRCode.toCanvas(document.createElement('canvas'), qrString, {
-                width: 250,
-                margin: 2,
+                width: 300,
+                margin: 4,
                 color: {
                     dark: '#000000',
                     light: '#ffffff'

@@ -116,18 +116,17 @@ python scripts/init_database.py
 cd backend
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
-
 ### 3. 访问系统
 
 #### Web管理后台
 - 直接打开 `webadmin/dashboard.html` 文件
-- 或配置Nginx反向代理（推荐）
+- 或配置Nginx反向代理（推荐）http://127.0.0.1/admin/
 
 #### 微信小程序
 - 使用微信开发者工具加载 `frontend` 目录
 - 修改 `app.js` 中的 `baseUrl` 为你的服务器地址
 
-## Nginx配置示例
+#### Nginx配置示例
 
 ```nginx
 # /etc/nginx/conf.d/eventcast.conf
