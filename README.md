@@ -151,6 +151,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 #### Web管理后台
 - 配置Nginx反向代理后通过 http://127.0.0.1/admin/ 访问（推荐）
+- ![img.png](img.png)
 - 或使用本地HTTP服务器（如 `python -m http.server 8080`）在 `webadmin/` 目录下启动
 
 #### 微信小程序
