@@ -21,14 +21,17 @@
 
 ### 后端
 - **FastAPI**：高性能异步Web框架
-- **MongoDB**：NoSQL数据库
-- **MQTT (EMQX)**：实时消息通信
+- **MongoDB**：NoSQL数据库（Motor 异步驱动）
+- **MQTT (EMQX)**：实时消息通信（Paho-MQTT 客户端）
 - **Python 3.9+**：后端开发语言
+- **python-jose**：JWT 认证与加密
+- **Bcrypt**：密码安全哈希
 
 ### 前端
 - **微信小程序**：用户端
 - **HTML5 + CSS3 + JavaScript**：Web管理后台
 - **Chart.js**：数据可视化
+- **QRCode.js**：二维码生成
 
 ## 系统架构
 
@@ -54,20 +57,48 @@
 eventcast-mqtt/
 ├── backend/              # 后端代码
 │   ├── api/              # API路由
+│   │   ├── events.py     # 活动管理接口
+│   │   ├── signin.py     # 签到管理接口
+│   │   ├── users.py      # 用户管理接口
+│   │   └── logs.py       # 日志管理接口
 │   ├── models/           # 数据模型
+│   │   ├── event.py      # 活动模型
+│   │   ├── user.py       # 用户模型
+│   │   ├── signin.py     # 签到模型
+│   │   └── log.py        # 日志模型
 │   ├── utils/            # 工具函数
+│   │   ├── auth.py       # 认证工具
+│   │   ├── database.py   # 数据库连接
+│   │   ├── mqtt_client.py# MQTT客户端
+│   │   ├── captcha.py    # 验证码生成
+│   │   ├── log_utils.py  # 日志工具
+│   │   └── logging_config.py # 日志配置
 │   ├── scripts/          # 初始化脚本
 │   ├── main.py           # 主应用入口
-│   └── requirements.txt  # 依赖包
+│   └── requirements.txt  # 后端依赖包
 ├── webadmin/             # Web管理后台
 │   ├── css/              # 样式文件
+│   ├── js/               # JavaScript脚本
+│   ├── index.html        # 登录页面
 │   ├── dashboard.html    # 数据看板
 │   ├── events.html       # 活动管理
 │   ├── attendees.html    # 报名人员管理
 │   ├── qrcode.html       # 签到二维码
+│   ├── users.html        # 用户管理
+│   ├── logs.html         # 日志查看
+│   ├── license.html      # 许可证页面
 │   └── config.js         # 配置文件
-├── frontend/             # 微信小程序
+├── frontend/
+│   └── miniprogram/      # 微信小程序
+│       ├── pages/        # 页面
+│       ├── utils/        # 工具函数
+│       └── app.js        # 小程序入口
+├── docs/                 # 项目文档
+│   ├── API.md            # API文档
+│   └── DEPLOYMENT.md     # 部署文档
 ├── .env.example          # 环境变量示例
+├── requirements.txt      # 根目录依赖包
+├── run.sh                # 启动脚本
 ├── LICENSE               # 许可证
 └── README.md             # 项目说明
 ```
@@ -93,7 +124,7 @@ cd eventcast-mqtt
 #### 安装依赖
 
 ```bash
-pip install -r backend/requirements.txt
+pip install -r requirements.txt
 ```
 
 #### 配置环境变量
@@ -119,11 +150,11 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ### 3. 访问系统
 
 #### Web管理后台
-- 直接打开 `webadmin/dashboard.html` 文件
-- 或配置Nginx反向代理（推荐）http://127.0.0.1/admin/
+- 配置Nginx反向代理后通过 http://127.0.0.1/admin/ 访问（推荐）
+- 或使用本地HTTP服务器（如 `python -m http.server 8080`）在 `webadmin/` 目录下启动
 
 #### 微信小程序
-- 使用微信开发者工具加载 `frontend` 目录
+- 使用微信开发者工具加载 `frontend/miniprogram` 目录
 - 修改 `app.js` 中的 `baseUrl` 为你的服务器地址
 
 #### Nginx配置示例
@@ -137,7 +168,7 @@ server {
     location /admin {
         alias /path/to/eventcast-mqtt/webadmin;
         index dashboard.html;
-        try_files $uri $uri/ /admin/index.html;
+        try_files $uri $uri/ /admin/dashboard.html;
     }
     
     location /api {
@@ -150,6 +181,8 @@ server {
 
 ## 默认账号
 
+> ⚠️ 以下账号仅用于开发/测试环境，生产环境请务必修改默认密码！
+
 | 角色 | 用户名 | 密码 | 说明 |
 |------|--------|------|------|
 | 学生 | student01 | 123456 | 测试学生账号 |
@@ -161,6 +194,7 @@ server {
 
 - `event/{event_id}/notice`：活动相关通知（创建、更新、提醒）
 - `event/{event_id}/sign_in`：实时签到数据同步
+- `user/{user_id}/notice`：用户个人通知
 - `system/broadcast`：系统级广播
 
 ## 数据库设计
@@ -177,16 +211,8 @@ server {
 ### 签到表
 - 记录用户的签到时间和方式
 
-## 项目截图
-
-> 注：项目截图请自行替换为实际界面截图
-
-| 模块 | 说明 |
-|------|------|
-| 数据看板 | 展示活动统计、报名数据、签到率等 |
-| 活动管理 | 活动列表、创建、编辑、取消 |
-| 报名管理 | 查看报名人员、签到状态 |
-| 小程序端 | 活动浏览、报名、扫码签到 |
+### 日志表
+- 记录操作日志和登录日志，包含操作类型、目标对象、IP地址等
 
 ## 贡献指南
 
