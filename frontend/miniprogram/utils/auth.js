@@ -83,7 +83,21 @@ function register(userData) {
   return new Promise((resolve, reject) => {
     console.log('📡 注册数据:', userData);
 
-    post('/users/register', userData, { showLoading: true })
+    // 确保发送到后端的数据格式正确
+    const registerData = {
+      user_id: userData.user_id,
+      username: userData.username,
+      password: userData.password,
+      confirmPassword: userData.confirmPassword,
+      real_name: userData.real_name,
+      email: userData.email || null,
+      phone: userData.phone || null,
+      role: userData.role || 'student'
+    };
+
+    console.log('📡 发送到后端的注册数据:', registerData);
+
+    post('/users/register', registerData, { showLoading: true })
       .then(res => {
         console.log('✅ 注册成功:', res);
 

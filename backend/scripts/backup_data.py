@@ -12,7 +12,7 @@ import shutil
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any
-import subprocess
+import subprocess  # nosec B404
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
@@ -234,7 +234,7 @@ class DataBackup:
             logger.info(f"执行mongodump命令: {' '.join(cmd)}")
 
             # 执行命令
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 capture_output=True,
                 text=True,
@@ -485,7 +485,7 @@ class DataBackup:
             logger.info(f"执行mongorestore命令: {' '.join(cmd)}")
 
             # 执行命令
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603
                 cmd,
                 capture_output=True,
                 text=True,

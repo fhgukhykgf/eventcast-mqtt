@@ -103,19 +103,51 @@ Page({
     const errors = {};
 
     if (!form.user_id) errors.user_id = '请输入学号';
+    else if (form.user_id.length < 3) errors.user_id = '学号至少3位';
+    
     if (!form.username) errors.username = '请输入用户名';
+    else if (form.username.length < 3) errors.username = '用户名至少3位';
+    
     if (!form.real_name) errors.real_name = '请输入真实姓名';
+    else if (form.real_name.length < 2) errors.real_name = '姓名至少2位';
+    
     if (!form.password) errors.password = '请输入密码';
     else if (form.password.length < 6) errors.password = '密码至少6位';
+    
     if (form.password !== form.confirmPassword) {
       errors.confirmPassword = '两次密码不一致';
     }
+    
+    // 前端预验证邮箱格式
+    if (form.email && form.email.trim()) {
+      const emailRegex = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+      if (!emailRegex.test(form.email)) {
+        errors.email = '邮箱格式不正确';
+      }
+    }
+    
+    // 前端预验证手机号格式
+    if (form.phone && form.phone.trim()) {
+      const phoneRegex = /^1[3-9]\d{9}$/;
+      if (!phoneRegex.test(form.phone)) {
+        errors.phone = '手机号格式不正确（11位）';
+      }
+    }
+    
     if (!this.data.agreeProtocol) {
       wx.showToast({ title: '请同意用户协议', icon: 'none' });
       return false;
     }
 
     this.setData({ errors });
+    
+    if (Object.keys(errors).length > 0) {
+      // 显示第一个错误
+      const firstError = Object.values(errors)[0];
+      wx.showToast({ title: firstError, icon: 'none', duration: 2000 });
+      return false;
+    }
+    
     return Object.keys(errors).length === 0;
   },
 
@@ -153,6 +185,8 @@ Page({
       setTimeout(() => this.setData({ isLogin: true }), 1500);
     } catch (err) {
       console.error('注册失败:', err);
+      // 错误信息已经在 request.js 中通过 toast 显示了
+      // 这里可以添加额外的错误处理逻辑
     } finally {
       this.setData({ loading: false });
     }

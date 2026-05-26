@@ -2,6 +2,7 @@
   "name": "eventcast-miniprogram",
   "version": "1.0.0",
   "dependencies": {
-    "mqtt": "^4.3.7"
+    "mqtt": "^4.3.7",
+    "weapp-qrcode-canvas-2d": "^1.1.6"
   }
 }

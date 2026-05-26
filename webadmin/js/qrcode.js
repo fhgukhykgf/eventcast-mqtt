@@ -107,8 +107,8 @@ var QRCode = (function() {
     
     QRCode.createQRCode = function(text) {
         var data = encodeData(text);
-        var version = 1;
-        var errorLevel = 3;
+        var version = 1;  // 使用最小版本，提高扫描成功率
+        var errorLevel = 2;
         
         var totalDataBits = [26, 44, 70, 100, 134, 172, 196, 242, 292, 346];
         var dataBits = totalDataBits[version - 1] - 8 - 2;
@@ -140,7 +140,7 @@ var QRCode = (function() {
         var eccData = codewords.slice(-eccBytes);
         codewords = paddedData.concat(eccData);
         
-        var moduleCount = 21;
+        var moduleCount = 21;  // 版本1: 21x21模块
         var modules = createEmptyMatrix(moduleCount);
         
         addFinderPatterns(modules);

@@ -11,6 +11,7 @@ from utils.mqtt_client import publish_message, is_mqtt_connected
 from utils.auth import get_current_user, require_organizer, TokenData, get_current_user_optional
 from utils.log_utils import log_operation
 from models.event import EventCreate, EventUpdate
+import re as regex_module
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -127,9 +128,11 @@ async def get_events(
         if status:
             query["status"] = status
         if search:
+            # 安全：转义正则特殊字符防止 ReDoS，并限制搜索长度
+            safe_search = regex_module.escape(search[:50])
             query["$or"] = [
-                {"title": {"$regex": search, "$options": "i"}},
-                {"location": {"$regex": search, "$options": "i"}}
+                {"title": {"$regex": safe_search, "$options": "i"}},
+                {"location": {"$regex": safe_search, "$options": "i"}}
             ]
 
         total = await events.count_documents(query)
@@ -246,11 +249,14 @@ async def update_event(event_id: str, event_update: EventUpdate, current_user: T
         db = await get_database()
         events = db["events"]
 
-        event = await events.find_one({"event_id": event_id})
+        event = await events.find_one({"event_id": event_id, "is_deleted": {"$ne": True}})
         if not event:
             raise HTTPException(status_code=404, detail="活动不存在")
 
         update_data = event_update.dict(exclude_unset=True)
+        # 安全：过滤掉不应被客户端修改的字段
+        for protected_field in ["is_deleted", "apply_count", "sign_count", "created_at", "created_by"]:
+            update_data.pop(protected_field, None)
         if update_data:
             update_data["updated_at"] = datetime.now().isoformat()
             update_data["updated_by"] = current_user.user_id
@@ -398,9 +404,11 @@ async def delete_event(event_id: str, current_user: TokenData = Depends(require_
         db = await get_database()
         events = db["events"]
 
-        # 先获取活动信息用于日志
-        event = await events.find_one({"event_id": event_id})
-        event_title = event.get("title") if event else event_id
+        # 先获取活动信息用于日志，并检查是否已删除
+        event = await events.find_one({"event_id": event_id, "is_deleted": {"$ne": True}})
+        if not event:
+            raise HTTPException(status_code=404, detail="活动不存在或已删除")
+        event_title = event.get("title", event_id)
 
         result = await events.update_one(
             {"event_id": event_id},
@@ -484,8 +492,8 @@ async def get_event_statistics(event_id: str, current_user: TokenData = Depends(
                 try:
                     hour = datetime.fromisoformat(sign_time.replace('Z', '+00:00')).hour
                     time_distribution[hour] = time_distribution.get(hour, 0) + 1
-                except:
-                    pass
+                except (ValueError, TypeError) as e:
+                    logger.debug(f"解析签到时间失败: {sign_time}, 错误: {e}")
 
         sign_rate = 0
         if event.get("apply_count", 0) > 0:

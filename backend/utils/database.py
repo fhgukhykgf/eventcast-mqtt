@@ -48,3 +48,33 @@ async def close_database():
         _client = None
         _db = None
         logger.info("MongoDB连接已关闭")
+
+
+async def check_database_health() -> bool:
+    """检查数据库是否健康"""
+    try:
+        db = await get_database()
+        await db.command("ping")
+        return True
+    except Exception as e:
+        logger.error(f"数据库健康检查失败: {e}")
+        return False
+
+
+async def get_database_stats() -> dict:
+    """获取数据库统计信息"""
+    try:
+        db = await get_database()
+        stats = await db.command("dbStats", scale=1)
+        return {
+            "database": stats.get("db", "eventcast"),
+            "collections": stats.get("collections", 0),
+            "objects": stats.get("objects", 0),
+            "data_size": stats.get("dataSize", 0),
+            "storage_size": stats.get("storageSize", 0),
+            "index_size": stats.get("indexSize", 0),
+            "total_size": stats.get("dataSize", 0) + stats.get("indexSize", 0)
+        }
+    except Exception as e:
+        logger.error(f"获取数据库统计失败: {e}")
+        return None

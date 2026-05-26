@@ -270,7 +270,7 @@
             captchaImage.innerHTML = '加载中...';
             
             try {
-                const response = await fetch(`${API_BASE}/users/captcha`);
+                const response = await fetch('/captcha');
                 const result = await response.json();
                 
                 if (result.code === 200) {

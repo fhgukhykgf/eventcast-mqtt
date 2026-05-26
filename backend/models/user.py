@@ -31,15 +31,17 @@ class UserRegister(BaseModel):
 
     @validator('phone')
     def validate_phone(cls, v):
-        if v and not re.match(r'^1[3-9]\d{9}$', v):
+        if v and v.strip() and not re.match(r'^1[3-9]\d{9}$', v):
             raise ValueError('手机号格式不正确')
-        return v
+        # 空字符串转为 None
+        return v if v and v.strip() else None
         
     @validator('email')
     def validate_email(cls, v):
-        if v and not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', v):
+        if v and v.strip() and not re.match(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$', v):
             raise ValueError('邮箱格式不正确')
-        return v
+        # 空字符串转为 None
+        return v if v and v.strip() else None
 
     @validator('confirmPassword')
     def passwords_match(cls, v, values):

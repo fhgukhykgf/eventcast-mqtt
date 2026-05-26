@@ -1,7 +1,8 @@
 """
 验证码工具模块
 """
-import random
+import random  # nosec B311 - 仅用于验证码图形渲染干扰元素
+import secrets
 import string
 import io
 import logging
@@ -13,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 # 验证码存储（生产环境应使用 Redis）
 _captcha_store: Dict[str, dict] = {}
+_MAX_CAPTCHA_STORE_SIZE = 1000  # 最大存储数量，防止内存泄漏
 
 
 def generate_captcha_code(length: int = 4) -> str:
-    """生成随机验证码"""
-    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=length))
+    """生成随机验证码（使用密码学安全随机数）"""
+    return ''.join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(length))
 
 
 def generate_captcha_image(code: str, width: int = 120, height: int = 40) -> bytes:
@@ -38,26 +40,26 @@ def generate_captcha_image(code: str, width: int = 120, height: int = 40) -> byt
             except:
                 font = ImageFont.load_default()
         
-        # 绘制背景干扰线
+        # 绘制背景干扰线（仅用于视觉干扰，无需密码学安全随机数）
         for _ in range(5):
-            x1 = random.randint(0, width)
-            y1 = random.randint(0, height)
-            x2 = random.randint(0, width)
-            y2 = random.randint(0, height)
+            x1 = random.randint(0, width)  # nosec B311
+            y1 = random.randint(0, height)  # nosec B311
+            x2 = random.randint(0, width)  # nosec B311
+            y2 = random.randint(0, height)  # nosec B311
             draw.line([(x1, y1), (x2, y2)], fill=(200, 200, 200), width=1)
-        
-        # 绘制干扰点
+
+        # 绘制干扰点（仅用于视觉干扰，无需密码学安全随机数）
         for _ in range(50):
-            x = random.randint(0, width)
-            y = random.randint(0, height)
-            draw.point((x, y), fill=(random.randint(150, 255), random.randint(150, 255), random.randint(150, 255)))
-        
-        # 绘制验证码文字
+            x = random.randint(0, width)  # nosec B311
+            y = random.randint(0, height)  # nosec B311
+            draw.point((x, y), fill=(random.randint(150, 255), random.randint(150, 255), random.randint(150, 255)))  # nosec B311
+
+        # 绘制验证码文字（仅用于视觉渲染，无需密码学安全随机数）
         colors = [(0, 102, 204), (204, 0, 0), (0, 153, 0), (153, 0, 153)]
         for i, char in enumerate(code):
-            color = random.choice(colors)
+            color = random.choice(colors)  # nosec B311
             x = 15 + i * 25
-            y = random.randint(5, 10)
+            y = random.randint(5, 10)  # nosec B311
             draw.text((x, y), char, font=font, fill=color)
         
         # 转换为字节
@@ -97,6 +99,14 @@ def create_captcha(captcha_id: str, expires_seconds: int = 300) -> tuple:
     image_bytes = generate_captcha_image(code)
     
     # 存储验证码
+    # 存储验证码前检查容量
+    if len(_captcha_store) >= _MAX_CAPTCHA_STORE_SIZE:
+        _clean_expired_captchas()
+        # 如果清理后仍然超过容量，删除最早的条目
+        if len(_captcha_store) >= _MAX_CAPTCHA_STORE_SIZE:
+            oldest_key = min(_captcha_store.keys(), key=lambda k: _captcha_store[k]["expires_at"])
+            del _captcha_store[oldest_key]
+    
     _captcha_store[captcha_id] = {
         "code": code.lower(),
         "expires_at": datetime.now() + timedelta(seconds=expires_seconds)

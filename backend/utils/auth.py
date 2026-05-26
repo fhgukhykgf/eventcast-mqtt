@@ -14,9 +14,20 @@ from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+DEFAULT_SECRET_KEY = "your-secret-key-change-in-production"  # nosec B105
+SECRET_KEY = os.getenv("SECRET_KEY", DEFAULT_SECRET_KEY)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
+
+# 安全检测：启动时检查 SECRET_KEY 是否为默认值
+if SECRET_KEY == DEFAULT_SECRET_KEY:
+    import warnings
+    warnings.warn(
+        "⚠️ 安全警告：SECRET_KEY 使用了默认值，请在生产环境中设置强随机密钥！"
+        "在 .env 文件中设置 SECRET_KEY=<随机密钥>",
+        RuntimeWarning,
+        stacklevel=2
+    )
 
 
 class TokenData(BaseModel):
@@ -73,17 +84,24 @@ def decode_token(token: str) -> Optional[TokenData]:
         return None
 
 
-async def get_current_user(authorization: Optional[str] = Header(None)) -> TokenData:
+async def get_current_user(
+    authorization: Optional[str] = Header(None),
+    token: Optional[str] = None
+) -> TokenData:
     """获取当前登录用户（依赖项）"""
+    # 支持从 query parameter 或 header 获取 token
+    if not authorization and token:
+        authorization = f"Bearer {token}"
+    
     if not authorization:
         raise HTTPException(status_code=401, detail="未登录，请先登录")
 
     if authorization.startswith("Bearer "):
-        token = authorization[7:]
+        auth_token = authorization[7:]
     else:
-        token = authorization
+        auth_token = authorization
 
-    token_data = decode_token(token)
+    token_data = decode_token(auth_token)
     if token_data is None:
         raise HTTPException(status_code=401, detail="Token 无效或已过期")
 

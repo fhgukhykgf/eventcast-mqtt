@@ -5,30 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>活动管理 · 活动快传</title>
     <link rel="stylesheet" href="css/style.css">
-    <style>
-        .detail-section {
-            margin-bottom: 16px;
-        }
-        .detail-row {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 12px;
-        }
-        .detail-label {
-            width: 80px;
-            flex-shrink: 0;
-            font-size: 13px;
-            color: #999;
-        }
-        .detail-value {
-            flex: 1;
-            font-size: 14px;
-            color: #333;
-        }
-        .detail-section > div:first-child {
-            margin-bottom: 12px;
-        }
-    </style>
 </head>
 <body>
     <div class="header">
@@ -60,9 +36,10 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 30%;">活动名称</th>
+                        <th style="width: 25%;">活动名称</th>
                         <th style="width: 20%;">活动时间</th>
-                        <th style="width: 15%;">状态</th>
+                        <th style="width: 10%;">报名/签到</th>
+                        <th style="width: 10%;">状态</th>
                         <th style="width: 35%;">操作</th>
                     </tr>
                 </thead>
@@ -91,12 +68,18 @@
 
             <div class="form-group">
                 <label class="form-label">活动开始时间 <span style="color: #ff4d4f;">*</span></label>
-                <input type="datetime-local" class="form-input" id="eventStartTime">
+                <div style="display: flex; gap: 8px;">
+                    <input type="date" class="form-input" id="eventStartDate" style="flex: 1;">
+                    <input type="time" class="form-input" id="eventStartTime" style="flex: 1;">
+                </div>
             </div>
 
             <div class="form-group">
                 <label class="form-label">活动结束时间 <span style="color: #ff4d4f;">*</span></label>
-                <input type="datetime-local" class="form-input" id="eventEndTime">
+                <div style="display: flex; gap: 8px;">
+                    <input type="date" class="form-input" id="eventEndDate" style="flex: 1;">
+                    <input type="time" class="form-input" id="eventEndTime" style="flex: 1;">
+                </div>
             </div>
 
             <div class="form-group">
@@ -145,8 +128,7 @@
         // 加载活动列表
         async function loadEvents() {
             try {
-                const response = await fetch(`${API_BASE}/events/list?limit=100`);
-                const result = await response.json();
+                const result = await api.get(`${API_BASE}/events/list?limit=100`);
 
                 if (result.code === 200) {
                     allEvents = result.data || [];
@@ -209,7 +191,7 @@
             if (events.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="4" style="text-align: center; padding: 60px; color: #999;">
+                        <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
                             <div style="font-size: 48px; margin-bottom: 16px;">📭</div>
                             <div>暂无活动数据</div>
                         </td>
@@ -265,11 +247,16 @@
                 <tr class="${isCancelled ? 'row-cancelled' : ''}">
                     <td>
                         <strong class="${isCancelled ? 'text-cancelled' : ''}">${e.title}</strong>
-                        <div style="font-size: 12px; color: #999; margin-top: 4px;">📍 ${e.location || '未知地点'}</div>
+                        <div class="text-muted">📍 ${e.location || '未知地点'}</div>
                     </td>
-                    <td style="font-size: 13px;">
+                    <td>
                         ${e.start_time || e.time}
-                        <br><span style="color:#999;">至 ${e.end_time || '待定'}</span>
+                        <br><span class="text-muted">至 ${e.end_time || '待定'}</span>
+                    </td>
+                    <td class="text-center">
+                        <div class="text-primary">📋 ${e.apply_count || 0}</div>
+                        <div class="text-success">✅ ${e.sign_count || 0}</div>
+                        <div class="text-muted text-small">${e.sign_rate || '0%'}</div>
                     </td>
                     <td>
                         <span class="status-badge ${statusClass}">${statusText}</span>
@@ -302,17 +289,14 @@
             const endTime = new Date(startTime);
             endTime.setHours(startTime.getHours() + 2);
             
-            const formatDate = (date) => {
-                const year = date.getFullYear();
-                const month = (date.getMonth() + 1).toString().padStart(2, '0');
-                const day = date.getDate().toString().padStart(2, '0');
-                const hour = date.getHours().toString().padStart(2, '0');
-                const minute = date.getMinutes().toString().padStart(2, '0');
-                return `${year}-${month}-${day}T${hour}:${minute}`;
-            };
+            const pad = (n) => n.toString().padStart(2, '0');
+            const formatDate = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+            const formatTime = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
             
-            document.getElementById('eventStartTime').value = formatDate(startTime);
-            document.getElementById('eventEndTime').value = formatDate(endTime);
+            document.getElementById('eventStartDate').value = formatDate(startTime);
+            document.getElementById('eventStartTime').value = formatTime(startTime);
+            document.getElementById('eventEndDate').value = formatDate(endTime);
+            document.getElementById('eventEndTime').value = formatTime(endTime);
 
             document.getElementById('eventLocation').value = '';
             document.getElementById('eventOrganizer').value = '';
@@ -323,8 +307,7 @@
         // 编辑活动
         async function editEvent(eventId) {
             try {
-                const response = await fetch(`${API_BASE}/events/detail/${eventId}`);
-                const result = await response.json();
+                const result = await api.get(`${API_BASE}/events/detail/${eventId}`);
 
                 if (result.code === 200) {
                     const event = result.data;
@@ -335,8 +318,12 @@
                     document.getElementById('eventIdInput').value = event.event_id;
                     document.getElementById('eventIdInput').disabled = true;
                     document.getElementById('eventTitle').value = event.title;
-                    document.getElementById('eventStartTime').value = (event.start_time || event.time).replace(' ', 'T');
-                    document.getElementById('eventEndTime').value = (event.end_time || event.time).replace(' ', 'T');
+                    const startDt = (event.start_time || event.time).replace(' ', 'T');
+                    const endDt = (event.end_time || event.time).replace(' ', 'T');
+                    document.getElementById('eventStartDate').value = startDt.split('T')[0];
+                    document.getElementById('eventStartTime').value = startDt.split('T')[1] || '00:00';
+                    document.getElementById('eventEndDate').value = endDt.split('T')[0];
+                    document.getElementById('eventEndTime').value = endDt.split('T')[1] || '00:00';
                     document.getElementById('eventLocation').value = event.location;
                     document.getElementById('eventOrganizer').value = event.organizer || '';
                     document.getElementById('eventDescription').value = event.description || '';
@@ -357,8 +344,7 @@
         async function showEventDetail(eventId) {
             currentDetailEventId = eventId;
             try {
-                const response = await fetch(`${API_BASE}/events/detail/${eventId}`);
-                const result = await response.json();
+                const result = await api.get(`${API_BASE}/events/detail/${eventId}`);
 
                 if (result.code === 200) {
                     const e = result.data;
@@ -470,8 +456,8 @@
             const eventData = {
                 event_id: document.getElementById('eventIdInput').value.trim(),
                 title: document.getElementById('eventTitle').value.trim(),
-                start_time: document.getElementById('eventStartTime').value.replace('T', ' '),
-                end_time: document.getElementById('eventEndTime').value.replace('T', ' '),
+                start_time: document.getElementById('eventStartDate').value + ' ' + document.getElementById('eventStartTime').value,
+                end_time: document.getElementById('eventEndDate').value + ' ' + document.getElementById('eventEndTime').value,
                 location: document.getElementById('eventLocation').value.trim(),
                 organizer: document.getElementById('eventOrganizer').value.trim(),
                 description: document.getElementById('eventDescription').value.trim()
@@ -486,11 +472,11 @@
                 Toast.warning('请输入活动名称');
                 return;
             }
-            if (!eventData.start_time) {
+            if (!eventData.start_time || !document.getElementById('eventStartDate').value || !document.getElementById('eventStartTime').value) {
                 Toast.warning('请选择活动开始时间');
                 return;
             }
-            if (!eventData.end_time) {
+            if (!eventData.end_time || !document.getElementById('eventEndDate').value || !document.getElementById('eventEndTime').value) {
                 Toast.warning('请选择活动结束时间');
                 return;
             }

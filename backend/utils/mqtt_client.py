@@ -258,6 +258,20 @@ def get_mqtt_client() -> Optional[mqtt.Client]:
     return _client
 
 
+def get_mqtt_safe_config() -> Dict[str, Any]:
+    """获取MQTT安全配置（脱敏，不包含密码）"""
+    config = get_mqtt_config()
+    return {
+        "broker": config["broker"],
+        "port": config["port"],
+        "username": config.get("username", ""),
+        # 不返回密码
+        "keepalive": config["keepalive"],
+        "reconnect_delay": config["reconnect_delay"],
+        "max_reconnect_attempts": config["max_reconnect_attempts"]
+    }
+
+
 def get_mqtt_status() -> Dict[str, Any]:
     """获取MQTT状态信息"""
     client = get_mqtt_client()
@@ -269,11 +283,14 @@ def get_mqtt_status() -> Dict[str, Any]:
         }
 
     try:
+        connected = is_mqtt_connected()
+        # 使用配置值而非私有属性，避免版本兼容问题
+        config = get_mqtt_safe_config()
         return {
-            "connected": is_mqtt_connected(),
-            "broker": client._host if hasattr(client, '_host') else None,
-            "port": client._port if hasattr(client, '_port') else None,
-            "client_id": client._client_id if hasattr(client, '_client_id') else None
+            "connected": connected,
+            "broker": config.get("broker"),
+            "port": config.get("port"),
+            "client_id": config.get("client_id") if not connected else None
         }
     except Exception as e:
         logger.error(f"获取MQTT状态失败: {e}")

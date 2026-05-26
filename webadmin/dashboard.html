@@ -133,8 +133,7 @@
         // 加载MQTT状态
         async function loadMqttStatus() {
             try {
-                const response = await fetch(`${API_BASE}/mqtt/status`);
-                const result = await response.json();
+                const result = await api.get(`${API_BASE}/mqtt/status`);
 
                 if (result.status === 'ok') {
                     const mqttStatus = result.mqtt.status;

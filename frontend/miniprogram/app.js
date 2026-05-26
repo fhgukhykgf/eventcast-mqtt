@@ -3,7 +3,8 @@ const mqttManager = require('./utils/mqtt.js');
 
 App({
   globalData: {
-    baseUrl: 'http://192.168.120.65:8000/api',
+    // TODO: 部署时修改为实际服务器地址，建议通过配置文件或环境变量管理
+    baseUrl: 'http://192.168.120.87:8000/api',
     mqttWsUrl: 'ws://192.168.1.64:8083/mqtt',
     userInfo: null,
     token: null
@@ -58,7 +59,9 @@ App({
     mqttManager.disconnect();
   },
 
+  // ⚠️ 已废弃：此方法生成假 Token，不应使用。请使用 utils/auth.js 中的 login() 方法
   login(userId, userName) {
+    console.warn('⚠️ app.login() 已废弃，请使用 utils/auth.js 中的 login() 方法');
     return new Promise((resolve) => {
       const userInfo = {
         user_id: userId,

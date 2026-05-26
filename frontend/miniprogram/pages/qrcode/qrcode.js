@@ -94,10 +94,12 @@ Page({
     const timestamp = Date.now();
     const validUntil = timestamp + 30 * 60 * 1000;
 
+    // 二维码内容：活动ID
     const qrString = event.event_id;
     console.log('二维码内容:', qrString);
 
-    const QRCode = require('../../utils/weapp-qrcode.js');
+    // 使用标准的 weapp-qrcode-canvas-2d 库
+    const drawQrcode = require('../../utils/weapp.qrcode.min.js');
     const that = this;
 
     // 显示生成中的提示
@@ -106,16 +108,53 @@ Page({
     // 延迟确保 canvas 已渲染
     setTimeout(() => {
       try {
-        QRCode.draw(qrString, 'qrcode', that, () => {
-          console.log('二维码生成成功');
-          
-          const expireDate = new Date(validUntil);
-          const expireTime = that.formatTime(expireDate);
+        // 使用 Canvas 2D API
+        const query = wx.createSelectorQuery().in(that);
+        query.select('#qrcode')
+          .fields({ node: true, size: true })
+          .exec((res) => {
+            if (res && res[0] && res[0].node) {
+              // Canvas 2D 模式
+              const canvas = res[0].node;
+              
+              drawQrcode({
+                canvas: canvas,
+                width: 280,
+                height: 280,
+                text: qrString,
+                correctLevel: 3, // Q级别纠错
+                padding: 0
+              });
+              
+              console.log('二维码生成成功 (Canvas 2D)');
+              
+              const expireDate = new Date(validUntil);
+              const expireTime = that.formatTime(expireDate);
 
-          that.setData({
-            expireTime: expireTime
+              that.setData({
+                expireTime: expireTime
+              });
+            } else {
+              // 旧版 API 模式
+              drawQrcode({
+                canvasId: 'qrcode',
+                width: 280,
+                height: 280,
+                text: qrString,
+                correctLevel: 3,
+                padding: 0
+              });
+              
+              console.log('二维码生成成功 (旧版 API)');
+              
+              const expireDate = new Date(validUntil);
+              const expireTime = that.formatTime(expireDate);
+
+              that.setData({
+                expireTime: expireTime
+              });
+            }
           });
-        });
       } catch (err) {
         console.error('生成二维码失败:', err);
         wx.showToast({ title: '生成失败，请重试', icon: 'none' });

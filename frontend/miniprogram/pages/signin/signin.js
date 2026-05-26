@@ -135,16 +135,26 @@ Page({
         
         // 解析二维码内容
         let scannedEventId = res.result;
+        console.log('原始扫描结果:', res.result, '长度:', res.result.length);
         
+        // 尝试解析URL格式：https://example.com/sign?event=xxx
+        const urlMatch = res.result.match(/[?&]event=([^&]+)/);
+        if (urlMatch) {
+          scannedEventId = decodeURIComponent(urlMatch[1]);
+          console.log('从URL解析活动ID:', scannedEventId);
+        }
         // 尝试解析JSON格式
-        try {
-          const qrData = JSON.parse(res.result);
-          if (qrData.event_id) {
-            scannedEventId = qrData.event_id;
+        else {
+          try {
+            const qrData = JSON.parse(res.result);
+            if (qrData.event_id) {
+              scannedEventId = qrData.event_id;
+              console.log('从JSON解析活动ID:', scannedEventId);
+            }
+          } catch (e) {
+            // 不是JSON，直接使用扫描结果作为活动ID
+            console.log('非JSON格式，直接作为活动ID:', scannedEventId);
           }
-        } catch (e) {
-          // 不是JSON，直接使用扫描结果作为活动ID
-          console.log('非JSON格式，直接作为活动ID:', scannedEventId);
         }
         
         // 检查扫描的活动ID是否匹配当前活动
@@ -174,31 +184,20 @@ Page({
       ? this.parseDate(event.end_time)
       : new Date(eventTime.getTime() + 2 * 60 * 60 * 1000);
 
-    // 检查是否是活动当天
-    const nowDate = now.toDateString();
-    const eventDate = eventTime.toDateString();
-    
-    if (nowDate !== eventDate) {
-      // 不是活动当天
-      if (now < eventTime) {
-        const diffDays = Math.ceil((eventTime - now) / (1000 * 60 * 60 * 24));
-        wx.showToast({ title: `签到未开始，还有${diffDays}天`, icon: 'none' });
-      } else {
-        wx.showToast({ title: '已过活动当天，无法签到', icon: 'none' });
-      }
-      return false;
-    }
-
-    // 活动当天，检查时间范围：开始前3小时到结束后3小时
+    // 签到时间窗口：活动开始前3小时到结束后3小时
     const signStartTime = new Date(eventTime.getTime() - 3 * 60 * 60 * 1000);
     const signEndTime = new Date(eventEndTime.getTime() + 3 * 60 * 60 * 1000);
 
     if (now < signStartTime) {
-      const diffMins = Math.ceil((signStartTime - now) / (1000 * 60));
-      if (diffMins > 60) {
-        const diffHours = Math.ceil(diffMins / 60);
+      const diffMs = signStartTime - now;
+      if (diffMs > 24 * 60 * 60 * 1000) {
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        wx.showToast({ title: `签到未开始，还有${diffDays}天`, icon: 'none' });
+      } else if (diffMs > 60 * 60 * 1000) {
+        const diffHours = Math.ceil(diffMs / (60 * 60 * 1000));
         wx.showToast({ title: `签到未开始，还需${diffHours}小时`, icon: 'none' });
       } else {
+        const diffMins = Math.ceil(diffMs / (60 * 1000));
         wx.showToast({ title: `签到未开始，还需${diffMins}分钟`, icon: 'none' });
       }
       return false;

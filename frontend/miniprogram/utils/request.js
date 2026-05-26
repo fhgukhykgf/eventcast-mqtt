@@ -69,9 +69,23 @@ function request(options) {
           // 404 不显示 toast，让调用方处理
           resolve({ code: 404, data: null, detail: res.data?.detail || '资源不存在' });
         } else {
+          // 处理 422 验证错误
+          let errorMsg = res.data?.detail || `请求失败 (${res.statusCode})`;
+          
+          // 如果是 422 错误，尝试解析详细错误信息
+          if (res.statusCode === 422 && res.data?.detail && Array.isArray(res.data.detail)) {
+            const errors = res.data.detail.map(err => {
+              const field = err.loc ? err.loc.join('.') : '';
+              const msg = err.msg || '';
+              return `${field}: ${msg}`;
+            });
+            errorMsg = errors.join('; ');
+          }
+          
           wx.showToast({
-            title: res.data?.detail || `请求失败 (${res.statusCode})`,
-            icon: 'none'
+            title: errorMsg,
+            icon: 'none',
+            duration: 3000
           });
           reject(new Error(`HTTP ${res.statusCode}`));
         }

@@ -105,7 +105,7 @@ def log_api_request(logger: logging.Logger, request_info: dict):
     """
     method = request_info.get('method', 'UNKNOWN')
     path = request_info.get('path', '/')
-    client = request_info.get('client', '0.0.0.0')
+    client = request_info.get('client', '0.0.0.0')  # nosec B104
     user_id = request_info.get('user_id', 'anonymous')
     processing_time = request_info.get('processing_time', 0)
     status_code = request_info.get('status_code', 200)
@@ -208,7 +208,7 @@ def log_user_activity(logger: logging.Logger, activity_info: dict):
     action = activity_info.get('action', 'unknown')
     event_id = activity_info.get('event_id')
     details = activity_info.get('details', {})
-    ip_address = activity_info.get('ip_address', '0.0.0.0')
+    ip_address = activity_info.get('ip_address', '0.0.0.0')  # nosec B104
 
     log_message = (
         f"用户活动 - 用户: {user_id}, "

@@ -20,7 +20,7 @@
 
     <div class="container">
         <div class="toolbar">
-            <div style="display: flex; gap: 16px; align-items: center;">
+            <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <label class="form-label">活动选择：</label>
                     <select class="form-select" id="eventSelect" onchange="loadAttendees()" style="min-width: 300px;">
@@ -39,6 +39,27 @@
                     </select>
                 </div>
                 <button class="btn btn-success" onclick="loadAttendees()">🔄 刷新</button>
+                <button class="btn btn-primary" id="exportBtn" onclick="exportSignList()" style="display: none;">📥 导出Excel</button>
+            </div>
+        </div>
+
+        <!-- 统计卡片 -->
+        <div class="stats-grid" id="statsCard" style="display: none;">
+            <div class="stat-card">
+                <div class="stat-label">📋 报名人数</div>
+                <div class="stat-value" id="statApply" style="color: #1890ff;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">✅ 签到人数</div>
+                <div class="stat-value" id="statSign" style="color: #52c41a;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">⏳ 未签到</div>
+                <div class="stat-value" id="statUnsigned" style="color: #fa8c16;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">📊 签到率</div>
+                <div class="stat-value" id="statRate" style="color: #722ed1;">0%</div>
             </div>
         </div>
 
@@ -128,8 +149,13 @@
                 `;
                 document.getElementById('eventInfo').textContent = '';
                 document.getElementById('pagination').innerHTML = '';
+                document.getElementById('statsCard').style.display = 'none';
+                document.getElementById('exportBtn').style.display = 'none';
                 return;
             }
+
+            // 显示导出按钮
+            document.getElementById('exportBtn').style.display = 'inline-block';
 
             try {
                 // 显示加载状态
@@ -147,6 +173,18 @@
                 if (eventResult && eventResult.code === 200) {
                     const event = eventResult.data;
                     document.getElementById('eventInfo').textContent = `${event.title} (${event.start_time || event.time} - ${event.end_time || event.time})`;
+                    
+                    // 更新统计卡片
+                    const applyCount = event.apply_count || 0;
+                    const signCount = event.sign_count || 0;
+                    const unsignedCount = applyCount - signCount;
+                    const signRate = applyCount > 0 ? `${round(signCount / applyCount * 100, 2)}%` : '0%';
+                    
+                    document.getElementById('statApply').textContent = applyCount;
+                    document.getElementById('statSign').textContent = signCount;
+                    document.getElementById('statUnsigned').textContent = unsignedCount;
+                    document.getElementById('statRate').textContent = signRate;
+                    document.getElementById('statsCard').style.display = 'grid';
                 }
 
                 // 获取报名人员
@@ -249,6 +287,39 @@
         function changePage(page) {
             currentPage = page;
             loadAttendees();
+        }
+
+        // 四舍五入辅助函数
+        function round(num, decimals) {
+            const factor = Math.pow(10, decimals);
+            return Math.round(num * factor) / factor;
+        }
+
+        // 导出Excel签到名单
+        function exportSignList() {
+            const eventId = document.getElementById('eventSelect').value;
+            if (!eventId) {
+                Toast.warning('请先选择活动');
+                return;
+            }
+            
+            Toast.info('正在生成Excel文件...');
+            
+            // 构建带Token的URL
+            const token = localStorage.getItem('token');
+            const url = `${API_BASE}/sign/export/${eventId}?token=${token}`;
+            
+            // 创建隐藏的a标签触发下载
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = '';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            setTimeout(() => {
+                Toast.success('导出成功');
+            }, 1000);
         }
 
         // 初始化

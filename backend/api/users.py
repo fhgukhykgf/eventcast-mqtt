@@ -3,6 +3,7 @@
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import Response
+from fastapi.exceptions import RequestValidationError
 from datetime import datetime
 import logging
 import uuid
@@ -84,6 +85,9 @@ class UserUpdate(BaseModel):
 async def register(user: UserRegister):
     """用户注册"""
     try:
+        logger.info(f"收到注册请求: user_id={user.user_id}, username={user.username}")
+        logger.debug(f"注册数据详情: {user.dict()}")
+        
         db = await get_database()
         users = db["users"]
 
@@ -97,6 +101,7 @@ async def register(user: UserRegister):
         if existing:
             raise HTTPException(status_code=400, detail="用户ID或用户名已存在")
 
+        # 安全：注册时强制角色为 student，忽略用户传入的 role
         user_data = user.dict()
         user_data["password"] = hash_password(user.password)
         user_data.update({
@@ -105,7 +110,7 @@ async def register(user: UserRegister):
             "status": "active",
             "apply_count": 0,
             "sign_count": 0,
-            "role": user.role or "student"
+            "role": "student"
         })
 
         if "confirmPassword" in user_data:
@@ -113,7 +118,7 @@ async def register(user: UserRegister):
 
         await users.insert_one(user_data)
 
-        token = create_access_token(user.user_id, user.role or "student")
+        token = create_access_token(user.user_id, "student")
 
         logger.info(f"用户注册成功: {user.user_id}")
 
@@ -127,7 +132,7 @@ async def register(user: UserRegister):
                     "real_name": user.real_name,
                     "email": user.email,
                     "phone": user.phone,
-                    "role": user.role or "student"
+                    "role": "student"
                 },
                 "token": token
             }
@@ -135,8 +140,18 @@ async def register(user: UserRegister):
 
     except HTTPException:
         raise
+    except RequestValidationError as e:
+        # 处理 Pydantic 验证错误
+        errors = []
+        for error in e.errors():
+            field = '.'.join(str(loc) for loc in error['loc'])
+            msg = error['msg']
+            errors.append(f"{field}: {msg}")
+        error_msg = '; '.join(errors)
+        logger.warning(f"注册验证失败: {error_msg}")
+        raise HTTPException(status_code=422, detail=error_msg)
     except Exception as e:
-        logger.error(f"注册失败: {e}")
+        logger.error(f"注册失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -247,8 +262,12 @@ async def login(login_data: UserLogin, request: Request):
 
 @router.get("/info/{user_id}")
 async def get_user_info(user_id: str, current_user: TokenData = Depends(get_current_user)):
-    """获取用户信息（需登录）"""
+    """获取用户信息（需登录，仅可查看自己或管理员/组织者可查看所有人）"""
     try:
+        # 访问控制：只能查看自己的信息，除非是管理员或组织者
+        if user_id != current_user.user_id and current_user.role not in ["admin", "organizer"]:
+            raise HTTPException(status_code=403, detail="无权查看其他用户信息")
+
         db = await get_database()
         user = await db["users"].find_one({"user_id": user_id})
 
@@ -279,8 +298,12 @@ async def get_user_info(user_id: str, current_user: TokenData = Depends(get_curr
 
 @router.get("/statistics/{user_id}")
 async def get_user_statistics(user_id: str, current_user: TokenData = Depends(get_current_user)):
-    """获取用户统计（需登录）"""
+    """获取用户统计（需登录，仅可查看自己或管理员/组织者可查看所有人）"""
     try:
+        # 访问控制：只能查看自己的统计，除非是管理员或组织者
+        if user_id != current_user.user_id and current_user.role not in ["admin", "organizer"]:
+            raise HTTPException(status_code=403, detail="无权查看其他用户统计")
+
         db = await get_database()
 
         apply_count = await db["user_apply"].count_documents({"user_id": user_id})
@@ -349,17 +372,20 @@ async def get_users_list(
 
         query = {}
         if search:
+            # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
+            import re as _re
+            safe_search = _re.escape(search[:50])
             query["$or"] = [
-                {"user_id": {"$regex": search, "$options": "i"}},
-                {"username": {"$regex": search, "$options": "i"}},
-                {"real_name": {"$regex": search, "$options": "i"}}
+                {"user_id": {"$regex": safe_search, "$options": "i"}},
+                {"username": {"$regex": safe_search, "$options": "i"}},
+                {"real_name": {"$regex": safe_search, "$options": "i"}}
             ]
         if role:
             query["role"] = role
 
         total = await users_col.count_documents(query)
 
-        cursor = users_col.find(query, {"password": 0}).sort("created_at", -1).skip(skip).limit(limit)
+        cursor = users_col.find(query, {"password": 0}).sort("created_at", -1).skip(skip).limit(limit)  # nosec B105
         users = await cursor.to_list(length=limit)
 
         result = []

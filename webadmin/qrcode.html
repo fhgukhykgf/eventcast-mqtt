@@ -18,7 +18,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .error-message { color: #ff4d4f; background: #fff1f0; padding: 10px; border-radius: 4px; margin: 10px 0; }
     </style>
-    <script src="js/qrcode.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -71,7 +71,7 @@
         const API_BASE = config.API_BASE;  // 修改为你的服务器IP
         let currentEvent = null;
         let qrInterval = null;
-        let currentQRCanvas = null;
+        let qrCodeInstance = null;
 
         // 加载活动列表
         async function loadEvents() {
@@ -161,13 +161,54 @@
                     currentEvent = result.data;
 
                     document.getElementById('eventInfo').style.display = 'block';
-                    document.getElementById('eventInfo').innerHTML = `
-                        <p><strong>📌 活动名称：</strong>${currentEvent.title}</p>
-                        <p><strong>⏰ 活动时间：</strong>${currentEvent.start_time || currentEvent.time || '时间待定'} - ${currentEvent.end_time || '时间待定'}</p>
-                        <p><strong>📍 活动地点：</strong>${currentEvent.location || '待定'}</p>
-                        <p><strong>📊 报名/签到：</strong>${currentEvent.apply_count || 0} / ${currentEvent.sign_count || 0} 人</p>
-                        <p><strong>📈 签到率：</strong>${currentEvent.sign_rate || '0%'}</p>
-                    `;
+                    const eventInfoEl = document.getElementById('eventInfo');
+                    eventInfoEl.innerHTML = '';
+                    
+                    const p1 = document.createElement('p');
+                    const strong1 = document.createElement('strong');
+                    strong1.textContent = '📌 活动名称：';
+                    p1.appendChild(strong1);
+                    const span1 = document.createElement('span');
+                    span1.textContent = currentEvent.title || '';
+                    p1.appendChild(span1);
+                    
+                    const p2 = document.createElement('p');
+                    const strong2 = document.createElement('strong');
+                    strong2.textContent = '⏰ 活动时间：';
+                    p2.appendChild(strong2);
+                    const span2 = document.createElement('span');
+                    span2.textContent = `${currentEvent.start_time || currentEvent.time || '时间待定'} - ${currentEvent.end_time || '时间待定'}`;
+                    p2.appendChild(span2);
+                    
+                    const p3 = document.createElement('p');
+                    const strong3 = document.createElement('strong');
+                    strong3.textContent = '📍 活动地点：';
+                    p3.appendChild(strong3);
+                    const span3 = document.createElement('span');
+                    span3.textContent = currentEvent.location || '待定';
+                    p3.appendChild(span3);
+                    
+                    const p4 = document.createElement('p');
+                    const strong4 = document.createElement('strong');
+                    strong4.textContent = '📊 报名/签到：';
+                    p4.appendChild(strong4);
+                    const span4 = document.createElement('span');
+                    span4.textContent = `${currentEvent.apply_count || 0} / ${currentEvent.sign_count || 0} 人`;
+                    p4.appendChild(span4);
+                    
+                    const p5 = document.createElement('p');
+                    const strong5 = document.createElement('strong');
+                    strong5.textContent = '📈 签到率：';
+                    p5.appendChild(strong5);
+                    const span5 = document.createElement('span');
+                    span5.textContent = currentEvent.sign_rate || '0%';
+                    p5.appendChild(span5);
+                    
+                    eventInfoEl.appendChild(p1);
+                    eventInfoEl.appendChild(p2);
+                    eventInfoEl.appendChild(p3);
+                    eventInfoEl.appendChild(p4);
+                    eventInfoEl.appendChild(p5);
 
                     document.getElementById('generateBtn').disabled = false;
 
@@ -184,31 +225,40 @@
 
         // 生成二维码
         function generateQRCode() {
-            if (!currentEvent) return;
+            if (!currentEvent) {
+                showError('请先选择活动');
+                return;
+            }
 
             hideError();
 
-            const qrString = currentEvent.event_id;
-            console.log('📊 二维码数据:', qrString);
+            if (typeof QRCode === 'undefined') {
+                showError('二维码生成库未加载，请刷新页面重试');
+                return;
+            }
 
-            document.getElementById('qrcode').innerHTML = '';
+            const qrString = String(currentEvent.event_id || '');
 
-            QRCode.toCanvas(document.createElement('canvas'), qrString, {
-                width: 300,
-                margin: 4,
-                color: {
-                    dark: '#000000',
-                    light: '#ffffff'
-                }
-            }, function(err, canvas) {
-                if (err) {
-                    console.error('❌ 二维码生成失败:', err);
-                    showError('二维码生成失败');
-                    return;
-                }
+            if (!qrString) {
+                showError('活动ID为空，无法生成二维码');
+                return;
+            }
 
-                currentQRCanvas = canvas;
-                document.getElementById('qrcode').appendChild(canvas);
+            const qrcodeEl = document.getElementById('qrcode');
+            qrcodeEl.innerHTML = '';
+
+            // 计算有效期（30分钟）
+            const validUntil = Date.now() + 30 * 60 * 1000;
+
+            try {
+                qrCodeInstance = new QRCode(qrcodeEl, {
+                    text: qrString,
+                    width: 300,
+                    height: 300,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
 
                 // 显示二维码信息
                 const validTime = new Date(validUntil).toLocaleTimeString();
@@ -225,7 +275,10 @@
 
                 // 设置定时刷新提醒
                 startRefreshTimer();
-            });
+            } catch (err) {
+                console.error('二维码生成异常:', err);
+                showError('二维码生成异常: ' + err.message);
+            }
         }
 
         // 刷新二维码
@@ -238,13 +291,21 @@
 
         // 下载二维码
         function downloadQRCode() {
-            if (!currentQRCanvas) return;
+            const qrcodeEl = document.getElementById('qrcode');
+            const canvas = qrcodeEl.querySelector('canvas');
+            const img = qrcodeEl.querySelector('img');
 
-            // 创建下载链接
-            const link = document.createElement('a');
-            link.download = `${currentEvent.title}_签到码.png`;
-            link.href = currentQRCanvas.toDataURL('image/png');
-            link.click();
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `${currentEvent.title}_签到码.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } else if (img) {
+                const link = document.createElement('a');
+                link.download = `${currentEvent.title}_签到码.png`;
+                link.href = img.src;
+                link.click();
+            }
         }
 
         // 启动刷新定时器（27分钟后提醒）
@@ -280,6 +341,12 @@
             showUserName();
             renderNav('qrcode');
 
+            // 检查QRCode库
+            if (typeof QRCode === 'undefined') {
+                showError('二维码生成库加载失败，请检查网络连接');
+                return;
+            }
+
             // 先测试连接
             const connected = await testConnection();
             if (connected) {
@@ -290,11 +357,36 @@
         init();
 
         // 清理定时器
-        window.onbeforeunload = function() {
-            if (qrInterval) {
-                clearTimeout(qrInterval);
+            window.onbeforeunload = function() {
+                if (qrInterval) {
+                    clearTimeout(qrInterval);
+                }
+            };
+            
+            // 页面可见性变化时刷新活动列表和二维码
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    console.log('🔄 页面变为可见，刷新活动列表...');
+                    refreshPageData();
+                }
+            });
+            
+            // 刷新页面数据
+            async function refreshPageData() {
+                if (!api.checkAuth()) return;
+                
+                try {
+                    await loadEvents();
+                    
+                    // 如果当前有选中的活动，重新加载活动信息和二维码
+                    const selectedEventId = document.getElementById('eventSelect').value;
+                    if (selectedEventId) {
+                        await loadEventInfo();
+                    }
+                } catch (err) {
+                    console.error('❌ 刷新页面数据失败:', err);
+                }
             }
-        };
-    </script>
+        </script>
 </body>
 </html>

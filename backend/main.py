@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 load_dotenv()
 sys.path.append(os.path.dirname(__file__))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,8 +18,12 @@ from typing import List
 
 from api import events, signin, users, logs
 from utils.database import get_database, close_database
-from utils.mqtt_client import connect_mqtt, disconnect_mqtt, get_mqtt_status, get_mqtt_config
+from utils.mqtt_client import connect_mqtt, disconnect_mqtt, get_mqtt_status, get_mqtt_safe_config
 from utils.logging_config import setup_logging, configure_uvicorn_logging, setup_error_logging
+from utils.auth import require_admin, TokenData, get_current_user
+from utils.captcha import create_captcha
+import uuid
+import base64
 
 setup_logging(
     log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -31,6 +36,10 @@ setup_error_logging()
 logger = logging.getLogger(__name__)
 
 ALLOWED_ORIGINS: List[str] = os.getenv("CORS_ORIGINS", "*").split(",")
+
+# 安全警告：CORS 配置为通配符时不安全
+if ALLOWED_ORIGINS == ["*"]:
+    logger.warning("⚠️ 安全警告：CORS_ORIGINS 为 '*'，允许任何来源跨域访问。生产环境请配置具体域名！")
 
 
 @asynccontextmanager
@@ -78,6 +87,12 @@ app.include_router(signin.router, prefix="/api/sign", tags=["签到管理"])
 app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(logs.router, prefix="/api/logs", tags=["日志管理"])
 
+# 挂载静态文件（webadmin目录）
+import os
+# static_dir = os.path.join(os.path.dirname(__file__), "..", "webadmin")
+# app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+# 静态文件由Nginx提供（参见nginx配置中的location /admin）
+
 
 @app.get("/")
 async def root():
@@ -89,6 +104,9 @@ async def root():
     }
 
 
+
+
+
 @app.get("/api/health")
 async def health_check():
     return {
@@ -98,16 +116,16 @@ async def health_check():
 
 
 @app.get("/api/mqtt/status")
-async def mqtt_status():
-    """获取MQTT状态信息"""
+async def mqtt_status(current_user: TokenData = Depends(require_admin)):
+    """获取MQTT状态信息（需管理员权限，敏感信息脱敏）"""
     try:
         status = get_mqtt_status()
-        config = get_mqtt_config()
+        safe_config = get_mqtt_safe_config()
         return {
             "status": "ok",
             "mqtt": {
                 "status": status,
-                "config": config
+                "config": safe_config
             }
         }
     except Exception as e:
@@ -123,7 +141,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host=os.getenv("BACKEND_HOST", "0.0.0.0"),
+        host=os.getenv("BACKEND_HOST", "0.0.0.0"),  # nosec B104
         port=int(os.getenv("BACKEND_PORT", "8000")),
         reload=os.getenv("DEBUG", "false").lower() == "true"
     )
