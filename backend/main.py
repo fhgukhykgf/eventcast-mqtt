@@ -20,7 +20,7 @@ from api import events, signin, users, logs
 from utils.database import get_database, close_database
 from utils.mqtt_client import connect_mqtt, disconnect_mqtt, get_mqtt_status, get_mqtt_safe_config
 from utils.logging_config import setup_logging, configure_uvicorn_logging, setup_error_logging
-from utils.auth import require_admin, require_organizer, TokenData, get_current_user
+from utils.auth import require_admin, TokenData, get_current_user
 from utils.captcha import create_captcha
 import uuid
 import base64
