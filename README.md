@@ -168,15 +168,39 @@ server {
     
     location /admin {
         alias /path/to/eventcast-mqtt/webadmin;
-        index dashboard.html;
-        try_files $uri $uri/ /admin/dashboard.html;
+        index index.html;
+        try_files $uri $uri/ /admin/index.html;
     }
     
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
+    # 验证码接口
+        location /captcha {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization";
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_pass http://127.0.0.1:8000/api/users/captcha;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    
+       location /api/ {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization";
+
+            # 关键：OPTIONS 预检请求直接在 Nginx 返回 204，不转发到后端
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_pass http://127.0.0.1:8000/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
 }
 ```
 
@@ -184,12 +208,12 @@ server {
 
 > ⚠️ 以下账号仅用于开发/测试环境，生产环境请务必修改默认密码！
 
-| 角色 | 用户名 | 密码 | 说明 |
-|------|--------|------|------|
-| 学生 | student01 | 123456 | 测试学生账号 |
-| 学生 | student02 | 123456 | 测试学生账号 |
-| 组织者 | organizer01 | 123456 | 可创建管理活动 |
-| 管理员 | admin | admin123 | 系统管理员 |
+| 角色 | 用户名         | 密码 | 说明 |
+|------|-------------|------|------|
+| 学生 | 20230001    | 123456 | 测试学生账号 |
+| 学生 | 20230002    | 123456 | 测试学生账号 |
+| 组织者 | O2023001 | 123456 | 可创建管理活动 |
+| 管理员 | admin       | admin123 | 系统管理员 |
 
 ## MQTT主题结构
 
