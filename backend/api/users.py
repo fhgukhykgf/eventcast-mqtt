@@ -367,21 +367,24 @@ async def get_users_list(
 ):
     """获取用户列表（管理员权限）"""
     try:
+        logger.info(f"获取用户列表请求: skip={skip}, limit={limit}, search={search}, role={role}")
+        
         db = await get_database()
         users_col = db["users"]
 
         query = {}
-        if search:
+        # 处理空字符串参数
+        if search and search.strip():
             # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
             import re as _re
-            safe_search = _re.escape(search[:50])
+            safe_search = _re.escape(search.strip()[:50])
             query["$or"] = [
                 {"user_id": {"$regex": safe_search, "$options": "i"}},
                 {"username": {"$regex": safe_search, "$options": "i"}},
                 {"real_name": {"$regex": safe_search, "$options": "i"}}
             ]
-        if role:
-            query["role"] = role
+        if role and role.strip():
+            query["role"] = role.strip()
 
         total = await users_col.count_documents(query)
 

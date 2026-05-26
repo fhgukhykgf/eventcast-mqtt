@@ -23,22 +23,22 @@
             <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <label class="form-label">活动选择：</label>
-                    <select class="form-select" id="eventSelect" onchange="loadAttendees()" style="min-width: 300px;">
+                    <select class="form-select" id="eventSelect" onchange="resetPage()" style="min-width: 300px;">
                         <option value="">加载中...</option>
                     </select>
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
-                    <input type="text" class="search-input" id="searchInput" placeholder="搜索姓名或学号..." oninput="loadAttendees()">
+                    <input type="text" class="search-input" id="searchInput" placeholder="搜索姓名或学号..." oninput="resetPage()">
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <label class="form-label">签到状态：</label>
-                    <select class="form-select" id="statusFilter" onchange="loadAttendees()">
+                    <select class="form-select" id="statusFilter" onchange="resetPage()">
                         <option value="">全部</option>
                         <option value="applied">未签到</option>
                         <option value="signed">已签到</option>
                     </select>
                 </div>
-                <button class="btn btn-success" onclick="loadAttendees()">🔄 刷新</button>
+                <button class="btn btn-success" onclick="resetPage()">🔄 刷新</button>
                 <button class="btn btn-primary" id="exportBtn" onclick="exportSignList()" style="display: none;">📥 导出Excel</button>
             </div>
         </div>
@@ -132,6 +132,12 @@
             }
         }
 
+        // 重置页码（用于搜索、筛选、切换活动时）
+        function resetPage() {
+            currentPage = 1;
+            loadAttendees();
+        }
+
         // 加载报名人员
         async function loadAttendees() {
             const eventId = document.getElementById('eventSelect').value;
@@ -187,21 +193,30 @@
                     document.getElementById('statsCard').style.display = 'grid';
                 }
 
-                // 获取报名人员
-                const result = await api.get(`${API_BASE}/sign/all/${eventId}`, {
+                // 构建请求参数
+                const params = {
                     skip: (currentPage - 1) * pageSize,
-                    limit: pageSize,
-                    search: search
-                });
+                    limit: pageSize
+                };
+                
+                // 添加搜索参数
+                if (search) {
+                    params.search = search;
+                }
+                
+                // 添加状态过滤参数
+                if (status) {
+                    params.status = status;
+                }
+
+                // 获取报名人员
+                const result = await api.get(`${API_BASE}/sign/all/${eventId}`, params);
 
                 if (result && result.code === 200) {
                     const attendees = result.data || [];
                     const total = result.total || 0;
 
-                    // 过滤状态
-                    const filteredAttendees = status ? attendees.filter(a => a.status === status) : attendees;
-
-                    if (filteredAttendees.length === 0) {
+                    if (attendees.length === 0) {
                         document.getElementById('attendeesList').innerHTML = `
                             <tr>
                                 <td colspan="5" style="text-align: center; padding: 60px; color: #999;">
@@ -211,7 +226,7 @@
                             </tr>
                         `;
                     } else {
-                        document.getElementById('attendeesList').innerHTML = filteredAttendees.map(a => `
+                        document.getElementById('attendeesList').innerHTML = attendees.map(a => `
                             <tr>
                                 <td>${a.user_name}</td>
                                 <td>${a.user_id}</td>
@@ -226,15 +241,16 @@
                         `).join('');
                     }
 
-                    renderPagination(total, filteredAttendees.length);
+                    renderPagination(total);
                 } else {
                     document.getElementById('attendeesList').innerHTML = `
                         <tr>
                             <td colspan="5" style="text-align: center; padding: 60px; color: #ff4d4f;">
                                 <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
                                 <div>加载失败: ${result?.msg || '未知错误'}</div>
-                            </tr>
-                        `;
+                            </td>
+                        </tr>
+                    `;
                 }
             } catch (err) {
                 console.error('加载报名人员失败:', err);
@@ -250,24 +266,42 @@
         }
 
         // 渲染分页
-        function renderPagination(total, filteredCount) {
+        function renderPagination(total) {
             const pagination = document.getElementById('pagination');
-            const totalPages = Math.ceil(filteredCount / pageSize);
+            const totalPages = Math.ceil(total / pageSize);
 
             if (totalPages <= 1) {
-                pagination.innerHTML = `<div style="text-align: center; padding: 16px; color: #666;">共 ${filteredCount} 人</div>`;
+                pagination.innerHTML = `<div style="text-align: center; padding: 16px; color: #666;">共 ${total} 人</div>`;
                 return;
             }
 
             let html = `<div style="display: flex; justify-content: space-between; align-items: center; padding: 16px;">
-                <div style="color: #666;">共 ${filteredCount} 人</div>
+                <div style="color: #666;">共 ${total} 人，第 ${currentPage}/${totalPages} 页</div>
                 <div style="display: flex; gap: 8px;">`;
 
+            // 首页按钮
             if (currentPage > 1) {
+                html += `<button class="btn" onclick="changePage(1)">⏮ 首页</button>`;
                 html += `<button class="btn" onclick="changePage(${currentPage - 1})">&lt; 上一页</button>`;
             }
 
-            for (let i = 1; i <= totalPages; i++) {
+            // 页码按钮（最多显示7个）
+            const maxButtons = 7;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<button class="btn" onclick="changePage(1)">1</button>`;
+                if (startPage > 2) {
+                    html += `<span style="padding: 0 8px; color: #999;">...</span>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
                 if (i === currentPage) {
                     html += `<button class="btn btn-primary" disabled>${i}</button>`;
                 } else {
@@ -275,8 +309,17 @@
                 }
             }
 
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<span style="padding: 0 8px; color: #999;">...</span>`;
+                }
+                html += `<button class="btn" onclick="changePage(${totalPages})">${totalPages}</button>`;
+            }
+
+            // 下一页和末页按钮
             if (currentPage < totalPages) {
-                html += `<button class="btn" onclick="changePage(${currentPage + 1})">&gt; 下一页</button>`;
+                html += `<button class="btn" onclick="changePage(${currentPage + 1})">下一页 &gt;</button>`;
+                html += `<button class="btn" onclick="changePage(${totalPages})">末页 ⏭</button>`;
             }
 
             html += `</div></div>`;
@@ -287,6 +330,8 @@
         function changePage(page) {
             currentPage = page;
             loadAttendees();
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
         // 四舍五入辅助函数

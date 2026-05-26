@@ -379,9 +379,10 @@ async def get_user_sign_records(user_id: str, skip: int = 0, limit: int = 20, cu
 
 
 @router.get("/all/{event_id}")
-async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, search: Optional[str] = None, current_user: TokenData = Depends(require_organizer)):
+async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, search: Optional[str] = None, status: Optional[str] = None, current_user: TokenData = Depends(require_organizer)):
     """
     获取活动的所有报名人员（需组织者或管理员权限）
+    status 参数: 'applied' (未签到), 'signed' (已签到)
     """
     try:
         db = await get_database()
@@ -410,13 +411,23 @@ async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, sear
         result = []
         for apply in applies:
             sign_record = sign_map.get(apply["user_id"])
+            record_status = "signed" if sign_record else "applied"
+            
+            # 如果指定了 status 过滤，则只返回匹配的记录
+            if status and record_status != status:
+                continue
+            
             result.append({
                 "user_id": apply["user_id"],
                 "user_name": apply["user_name"],
                 "apply_time": apply["apply_time"],
                 "sign_time": sign_record.get("sign_time") if sign_record else None,
-                "status": "signed" if sign_record else "applied"
+                "status": record_status
             })
+
+        # 如果有 status 过滤，需要重新计算 total
+        if status:
+            total = len(result)
 
         return {
             "code": 200,

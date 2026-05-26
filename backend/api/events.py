@@ -181,6 +181,45 @@ async def get_events(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/stats")
+async def get_events_stats(current_user: TokenData = Depends(require_organizer)):
+    """
+    获取所有活动的报名和签到统计（从数据库实际统计）
+    """
+    try:
+        db = await get_database()
+        events_col = db["events"]
+        applies_col = db["user_apply"]
+        signs_col = db["sign_records"]
+
+        # 获取所有活动
+        events = await events_col.find({"is_deleted": {"$ne": True}}).to_list(length=None)
+        
+        stats = {}
+        for event in events:
+            event_id = event["event_id"]
+            
+            # 从数据库实际统计
+            apply_count = await applies_col.count_documents({"event_id": event_id})
+            sign_count = await signs_col.count_documents({"event_id": event_id})
+            
+            stats[event_id] = {
+                "apply_count": apply_count,
+                "sign_count": sign_count
+            }
+        
+        logger.info(f"📊 统计了 {len(stats)} 个活动的报名签到数据")
+        
+        return {
+            "code": 200,
+            "data": stats
+        }
+
+    except Exception as e:
+        logger.error(f"❌ 获取统计数据失败: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/detail/{event_id}")
 async def get_event_detail(
     event_id: str,

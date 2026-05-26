@@ -22,15 +22,15 @@
     <div class="container">
         <div class="stats-grid" id="statsCards">
             <div class="stat-card">
-                <div class="stat-label">总活动数</div>
+                <div class="stat-label">活动数 <small id="timeRangeLabel" style="color: #999; font-weight: normal;">(最近7天)</small></div>
                 <div class="stat-value" id="totalEvents">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">总报名人数</div>
+                <div class="stat-label">报名人数</div>
                 <div class="stat-value" id="totalApply">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">总签到人数</div>
+                <div class="stat-label">签到人数</div>
                 <div class="stat-value" id="totalSign">0</div>
             </div>
             <div class="stat-card">
@@ -166,16 +166,25 @@
                 document.getElementById('recentEvents').innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
                 document.getElementById('hotEvents').innerHTML = '<div style="text-align: center; padding: 40px;">加载中...</div>';
 
-                const result = await api.get(`${API_BASE}/events/list`, { limit: 100 });
+                const result = await api.get(`${API_BASE}/events/list`, { limit: 200 });
 
                 if (result && result.code === 200) {
-                    const events = result.data || [];
-                    renderStats(events);
-                    renderRecentEvents(events);
-                    loadCompareChart(events);
-                    loadTimeChart(events);
-                    loadHotEvents(events);
-                    loadTrendChart(events);
+                    const allEvents = result.data || [];
+                    
+                    // 根据时间范围过滤活动
+                    const days = parseInt(document.getElementById('timeRange').value);
+                    const filteredEvents = filterEventsByTimeRange(allEvents, days);
+                    
+                    // 更新时间范围标签
+                    updateTimeRangeLabel(days);
+                    
+                    // 从数据库获取实际的报名和签到统计
+                    await renderStatsWithRealData(filteredEvents);
+                    renderRecentEvents(filteredEvents);
+                    loadCompareChart(filteredEvents);
+                    loadTimeChart(filteredEvents);
+                    loadHotEvents(filteredEvents);
+                    loadTrendChart(filteredEvents);
                     loadMqttStatus();
                 } else {
                     showError('加载失败：' + (result?.msg || '未知错误'));
@@ -186,17 +195,69 @@
             }
         }
 
-        // 渲染统计卡片
-        function renderStats(events) {
+        // 根据时间范围过滤活动
+        function filterEventsByTimeRange(events, days) {
+            const now = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - days);
+            
+            return events.filter(event => {
+                // 尝试解析活动时间
+                const eventTime = event.start_time || event.time || event.created_at;
+                if (!eventTime) return false;
+                
+                try {
+                    const eventDate = new Date(eventTime);
+                    return eventDate >= startDate && eventDate <= now;
+                } catch (e) {
+                    return false;
+                }
+            });
+        }
+
+        // 更新时间范围标签
+        function updateTimeRangeLabel(days) {
+            const label = document.getElementById('timeRangeLabel');
+            if (days === 7) {
+                label.textContent = '(最近7天)';
+            } else if (days === 30) {
+                label.textContent = '(最近30天)';
+            } else if (days === 90) {
+                label.textContent = '(最近90天)';
+            } else if (days === 365) {
+                label.textContent = '(全年)';
+            } else {
+                label.textContent = `(最近${days}天)`;
+            }
+        }
+
+        // 渲染统计卡片（从数据库实际统计）
+        async function renderStatsWithRealData(events) {
             const totalEvents = events.length;
             let totalApply = 0, totalSign = 0;
 
-            events.forEach(e => {
-                totalApply += e.apply_count || 0;
-                totalSign += e.sign_count || 0;
-            });
-
-            const avgRate = totalApply ? Math.round(totalSign / totalApply * 100) : 0;
+            try {
+                // 一次性获取所有活动的统计数据
+                const statsResult = await api.get(`${API_BASE}/events/stats`);
+                
+                if (statsResult && statsResult.code === 200) {
+                    const stats = statsResult.data || {};
+                    
+                    // 累加过滤后的活动的统计数据
+                    events.forEach(event => {
+                        const eventStats = stats[event.event_id] || { apply_count: 0, sign_count: 0 };
+                        totalApply += eventStats.apply_count || 0;
+                        totalSign += eventStats.sign_count || 0;
+                    });
+                }
+            } catch (err) {
+                console.error('获取统计数据失败:', err);
+                // 如果获取失败，使用活动表中的统计数据作为备用
+                events.forEach(e => {
+                    totalApply += e.apply_count || 0;
+                    totalSign += e.sign_count || 0;
+                });
+            }
 
             document.getElementById('totalEvents').textContent = totalEvents;
             document.getElementById('totalApply').textContent = totalApply;
