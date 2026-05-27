@@ -1,25 +1,22 @@
-# EventCast-MQTT 后端核心依赖
-# FastAPI Web 框架
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+fastapi>=0.133.0,<0.137.0
+uvicorn[standard]>=0.30.6
+pydantic>=2.7.0,<3.0.0
+email-validator>=2.0.0
 
-# 数据库（MongoDB 异步驱动）
 pymongo>=4.6.0,<5.0.0
 motor>=3.3.0,<4.0.0
 
-# MQTT 客户端（注意：必须是 2.x 版本）
 paho-mqtt==2.1.0
 
-# 图片处理（验证码生成）
-Pillow==10.1.0
+Pillow==12.2.0
 
-# 加密与安全
 bcrypt==4.1.2
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.4.0
 
-# 工具类
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 
-# Excel 导出功能
 openpyxl==3.1.2
+
+requests>=2.31.0
+psutil>=5.9.0
+python-json-logger>=2.0.0
