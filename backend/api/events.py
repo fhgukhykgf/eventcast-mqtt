@@ -195,17 +195,26 @@ async def get_events_stats(current_user: TokenData = Depends(require_organizer))
         # 获取所有活动
         events = await events_col.find({"is_deleted": {"$ne": True}}).to_list(length=None)
         
+        # 一次性统计所有活动的报名数
+        apply_stats_cursor = applies_col.aggregate([
+            {"$group": {"_id": "$event_id", "count": {"$sum": 1}}}
+        ])
+        apply_stats_list = await apply_stats_cursor.to_list(length=None)
+        apply_stats_map = {s["_id"]: s["count"] for s in apply_stats_list}
+
+        # 一次性统计所有活动的签到数
+        sign_stats_cursor = signs_col.aggregate([
+            {"$group": {"_id": "$event_id", "count": {"$sum": 1}}}
+        ])
+        sign_stats_list = await sign_stats_cursor.to_list(length=None)
+        sign_stats_map = {s["_id"]: s["count"] for s in sign_stats_list}
+        
         stats = {}
         for event in events:
             event_id = event["event_id"]
-            
-            # 从数据库实际统计
-            apply_count = await applies_col.count_documents({"event_id": event_id})
-            sign_count = await signs_col.count_documents({"event_id": event_id})
-            
             stats[event_id] = {
-                "apply_count": apply_count,
-                "sign_count": sign_count
+                "apply_count": apply_stats_map.get(event_id, 0),
+                "sign_count": sign_stats_map.get(event_id, 0)
             }
         
         logger.info(f"📊 统计了 {len(stats)} 个活动的报名签到数据")

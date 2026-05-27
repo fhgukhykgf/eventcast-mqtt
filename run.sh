@@ -27,7 +27,7 @@ pip install -r requirements.txt
 
 # 初始化数据库
 echo "🗄️  初始化数据库..."
-python scripts/init_database.py
+python backend/scripts/init_database.py
 
 # 启动后端
 echo "🌐 启动后端服务..."

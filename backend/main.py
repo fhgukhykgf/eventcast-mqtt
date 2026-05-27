@@ -10,7 +10,6 @@ sys.path.append(os.path.dirname(__file__))
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -20,10 +19,7 @@ from api import events, signin, users, logs
 from utils.database import get_database, close_database
 from utils.mqtt_client import connect_mqtt, disconnect_mqtt, get_mqtt_status, get_mqtt_safe_config
 from utils.logging_config import setup_logging, configure_uvicorn_logging, setup_error_logging
-from utils.auth import require_admin, TokenData, get_current_user
-from utils.captcha import create_captcha
-import uuid
-import base64
+from utils.auth import require_admin, require_organizer, TokenData, get_current_user
 
 setup_logging(
     log_level=os.getenv("LOG_LEVEL", "INFO"),
@@ -87,12 +83,6 @@ app.include_router(signin.router, prefix="/api/sign", tags=["签到管理"])
 app.include_router(users.router, prefix="/api/users", tags=["用户管理"])
 app.include_router(logs.router, prefix="/api/logs", tags=["日志管理"])
 
-# 挂载静态文件（webadmin目录）
-import os
-# static_dir = os.path.join(os.path.dirname(__file__), "..", "webadmin")
-# app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-# 静态文件由Nginx提供（参见nginx配置中的location /admin）
-
 
 @app.get("/")
 async def root():
@@ -102,9 +92,6 @@ async def root():
         "status": "running",
         "docs": "/docs"
     }
-
-
-
 
 
 @app.get("/api/health")
@@ -141,7 +128,7 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "main:app",
-        host=os.getenv("BACKEND_HOST", "0.0.0.0"),  # nosec B104
+        host=os.getenv("BACKEND_HOST", "0.0.0.0"),
         port=int(os.getenv("BACKEND_PORT", "8000")),
         reload=os.getenv("DEBUG", "false").lower() == "true"
     )

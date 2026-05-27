@@ -333,9 +333,15 @@ async def get_user_sign_records(user_id: str, skip: int = 0, limit: int = 20, cu
 
         sign_map = {s["event_id"]: s for s in signs}
 
+        # 一次性查询所有活动，避免 N+1 查询
+        event_ids = [apply["event_id"] for apply in applies]
+        events_cursor = db["events"].find({"event_id": {"$in": event_ids}})
+        events = await events_cursor.to_list(length=None)
+        event_map = {event["event_id"]: event for event in events}
+
         result = []
         for apply in applies:
-            event = await db["events"].find_one({"event_id": apply["event_id"]})
+            event = event_map.get(apply["event_id"])
             if event:
                 sign_record = sign_map.get(apply["event_id"])
                 
@@ -387,7 +393,24 @@ async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, sear
     try:
         db = await get_database()
 
+        # 首先获取所有签到记录
+        signs = await db["sign_records"].find(
+            {"event_id": event_id}
+        ).to_list(length=None)
+        signed_user_ids = {s["user_id"] for s in signs}
+        sign_map = {s["user_id"]: s for s in signs}
+
+        # 构建查询
         query: Dict[str, Any] = {"event_id": event_id}
+        
+        # 根据 status 过滤
+        if status:
+            if status == "signed":
+                query["user_id"] = {"$in": list(signed_user_ids)}
+            elif status == "applied":
+                query["user_id"] = {"$nin": list(signed_user_ids)}
+        
+        # 添加搜索过滤
         if search:
             # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
             import re as _re
@@ -397,25 +420,17 @@ async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, sear
                 {"user_id": {"$regex": safe_search, "$options": "i"}}
             ]
 
+        # 计算总数
         total = await db["user_apply"].count_documents(query)
 
+        # 获取分页数据
         cursor = db["user_apply"].find(query).sort("apply_time", -1).skip(skip).limit(limit)
         applies = await cursor.to_list(length=limit)
-
-        signs = await db["sign_records"].find(
-            {"event_id": event_id}
-        ).to_list(length=None)
-
-        sign_map = {s["user_id"]: s for s in signs}
 
         result = []
         for apply in applies:
             sign_record = sign_map.get(apply["user_id"])
             record_status = "signed" if sign_record else "applied"
-            
-            # 如果指定了 status 过滤，则只返回匹配的记录
-            if status and record_status != status:
-                continue
             
             result.append({
                 "user_id": apply["user_id"],
@@ -424,10 +439,6 @@ async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, sear
                 "sign_time": sign_record.get("sign_time") if sign_record else None,
                 "status": record_status
             })
-
-        # 如果有 status 过滤，需要重新计算 total
-        if status:
-            total = len(result)
 
         return {
             "code": 200,

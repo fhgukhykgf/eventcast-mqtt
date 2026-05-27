@@ -4,10 +4,12 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import Response
 from fastapi.exceptions import RequestValidationError
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict
+from collections import defaultdict
+import threading
 
 from utils.database import get_database
 from utils.auth import (
@@ -25,6 +27,75 @@ from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# 登录频率限制配置
+LOGIN_MAX_ATTEMPTS = 5  # 最大尝试次数
+LOGIN_WINDOW_SECONDS = 300  # 时间窗口（5分钟）
+LOGIN_LOCKOUT_SECONDS = 600  # 锁定时间（10分钟）
+
+_login_attempts: Dict[str, dict] = {}
+_login_lock = threading.Lock()
+
+
+def _get_attempt_key(ip_address: str, identifier: str) -> str:
+    return f"{ip_address}:{identifier}"
+
+
+def _check_rate_limit(ip_address: str, identifier: str) -> tuple:
+    with _login_lock:
+        key = _get_attempt_key(ip_address, identifier)
+        now = datetime.now()
+
+        if key not in _login_attempts:
+            return True, 0, None
+
+        record = _login_attempts[key]
+
+        if record.get("locked_until") and now < record["locked_until"]:
+            remaining = int((record["locked_until"] - now).total_seconds())
+            return False, remaining, "locked"
+
+        if record.get("locked_until") and now >= record["locked_until"]:
+            del _login_attempts[key]
+            return True, 0, None
+
+        window_start = now - timedelta(seconds=LOGIN_WINDOW_SECONDS)
+        recent_attempts = [t for t in record.get("attempts", []) if t > window_start]
+        record["attempts"] = recent_attempts
+
+        if len(recent_attempts) >= LOGIN_MAX_ATTEMPTS:
+            record["locked_until"] = now + timedelta(seconds=LOGIN_LOCKOUT_SECONDS)
+            return False, LOGIN_LOCKOUT_SECONDS, "locked"
+
+        return True, 0, None
+
+
+def _record_failed_attempt(ip_address: str, identifier: str):
+    with _login_lock:
+        key = _get_attempt_key(ip_address, identifier)
+        now = datetime.now()
+
+        if key not in _login_attempts:
+            _login_attempts[key] = {"attempts": [], "locked_until": None}
+
+        _login_attempts[key]["attempts"].append(now)
+
+
+def _clear_attempts(ip_address: str, identifier: str):
+    with _login_lock:
+        key = _get_attempt_key(ip_address, identifier)
+        _login_attempts.pop(key, None)
+
+
+def _cleanup_expired_records():
+    with _login_lock:
+        now = datetime.now()
+        expired_keys = [
+            k for k, v in _login_attempts.items()
+            if v.get("locked_until") and now >= v["locked_until"]
+        ]
+        for key in expired_keys:
+            del _login_attempts[key]
 
 
 @router.get("/captcha")
@@ -95,7 +166,8 @@ async def register(user: UserRegister):
             "$or": [
                 {"user_id": user.user_id},
                 {"username": user.username}
-            ]
+            ],
+            "is_deleted": {"$ne": True}
         })
 
         if existing:
@@ -159,8 +231,17 @@ async def register(user: UserRegister):
 async def login(login_data: UserLogin, request: Request):
     """用户登录"""
     source = "webadmin" if login_data.captcha_id else "miniprogram"
-    ip_address = request.client.host if request.client else None
-    
+    ip_address = request.client.host if request.client else "unknown"
+
+    _cleanup_expired_records()
+
+    allowed, remaining, reason = _check_rate_limit(ip_address, login_data.identifier)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"登录尝试次数过多，请在 {remaining} 秒后重试"
+        )
+
     try:
         # 验证验证码
         if login_data.captcha_id and login_data.captcha_code:
@@ -174,10 +255,12 @@ async def login(login_data: UserLogin, request: Request):
             "$or": [
                 {"username": login_data.identifier},
                 {"user_id": login_data.identifier}
-            ]
+            ],
+            "is_deleted": {"$ne": True}
         })
 
         if not user:
+            _record_failed_attempt(ip_address, login_data.identifier)
             await log_login(
                 user_id=login_data.identifier,
                 user_name=login_data.identifier,
@@ -189,6 +272,7 @@ async def login(login_data: UserLogin, request: Request):
             raise HTTPException(status_code=401, detail="用户不存在")
 
         if user["status"] != "active":
+            _record_failed_attempt(ip_address, login_data.identifier)
             await log_login(
                 user_id=user["user_id"],
                 user_name=user["username"],
@@ -200,6 +284,7 @@ async def login(login_data: UserLogin, request: Request):
             raise HTTPException(status_code=401, detail="账号已被禁用")
 
         if not verify_password(login_data.password, user["password"]):
+            _record_failed_attempt(ip_address, login_data.identifier)
             await log_login(
                 user_id=user["user_id"],
                 user_name=user["username"],
@@ -214,6 +299,8 @@ async def login(login_data: UserLogin, request: Request):
             {"_id": user["_id"]},
             {"$set": {"last_login": datetime.now().isoformat()}}
         )
+
+        _clear_attempts(ip_address, login_data.identifier)
 
         # 记录登录成功日志
         await log_login(
@@ -269,10 +356,10 @@ async def get_user_info(user_id: str, current_user: TokenData = Depends(get_curr
             raise HTTPException(status_code=403, detail="无权查看其他用户信息")
 
         db = await get_database()
-        user = await db["users"].find_one({"user_id": user_id})
+        user = await db["users"].find_one({"user_id": user_id, "is_deleted": {"$ne": True}})
 
         if not user:
-            raise HTTPException(status_code=404, detail="用户不存在")
+            raise HTTPException(status_code=404, detail="用户不存在或已删除")
 
         return {
             "code": 200,
@@ -332,10 +419,10 @@ async def get_current_user_info(current_user: TokenData = Depends(get_current_us
     """获取当前登录用户信息"""
     try:
         db = await get_database()
-        user = await db["users"].find_one({"user_id": current_user.user_id})
+        user = await db["users"].find_one({"user_id": current_user.user_id, "is_deleted": {"$ne": True}})
 
         if not user:
-            raise HTTPException(status_code=404, detail="用户不存在")
+            raise HTTPException(status_code=404, detail="用户不存在或已删除")
 
         return {
             "code": 200,
@@ -372,7 +459,7 @@ async def get_users_list(
         db = await get_database()
         users_col = db["users"]
 
-        query = {}
+        query = {"is_deleted": {"$ne": True}}
         # 处理空字符串参数
         if search and search.strip():
             # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
@@ -423,7 +510,8 @@ async def admin_create_user(user: UserCreate, current_user: TokenData = Depends(
             "$or": [
                 {"user_id": user.user_id},
                 {"username": user.username}
-            ]
+            ],
+            "is_deleted": {"$ne": True}
         })
 
         if existing:
@@ -475,9 +563,9 @@ async def admin_update_user(user_id: str, user: UserUpdate, current_user: TokenD
         db = await get_database()
         users_col = db["users"]
 
-        existing = await users_col.find_one({"user_id": user_id})
+        existing = await users_col.find_one({"user_id": user_id, "is_deleted": {"$ne": True}})
         if not existing:
-            raise HTTPException(status_code=404, detail="用户不存在")
+            raise HTTPException(status_code=404, detail="用户不存在或已删除")
 
         update_data = user.dict(exclude_unset=True)
         
@@ -520,7 +608,7 @@ async def admin_update_user(user_id: str, user: UserUpdate, current_user: TokenD
 
 @router.delete("/delete/{user_id}")
 async def admin_delete_user(user_id: str, current_user: TokenData = Depends(require_admin)):
-    """管理员删除用户"""
+    """管理员删除用户（软删除）"""
     try:
         if user_id == current_user.user_id:
             raise HTTPException(status_code=400, detail="不能删除自己的账号")
@@ -528,10 +616,21 @@ async def admin_delete_user(user_id: str, current_user: TokenData = Depends(requ
         db = await get_database()
         users_col = db["users"]
 
-        result = await users_col.delete_one({"user_id": user_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="用户不存在")
+        user = await users_col.find_one({"user_id": user_id, "is_deleted": {"$ne": True}})
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在或已删除")
+
+        result = await users_col.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "is_deleted": True,
+                "status": "deleted",
+                "updated_at": datetime.now().isoformat()
+            }}
+        )
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=500, detail="删除失败")
 
         logger.info(f"管理员删除用户: {user_id}")
 
@@ -542,8 +641,8 @@ async def admin_delete_user(user_id: str, current_user: TokenData = Depends(requ
             action="delete",
             target_type="user",
             target_id=user_id,
-            target_name=user_id,
-            detail=f"删除用户: {user_id}",
+            target_name=user.get("real_name", user_id),
+            detail=f"删除用户: {user.get('username', user_id)}",
             source="webadmin"
         )
 
@@ -566,9 +665,9 @@ async def toggle_user_status(user_id: str, current_user: TokenData = Depends(req
         db = await get_database()
         users_col = db["users"]
 
-        user = await users_col.find_one({"user_id": user_id})
+        user = await users_col.find_one({"user_id": user_id, "is_deleted": {"$ne": True}})
         if not user:
-            raise HTTPException(status_code=404, detail="用户不存在")
+            raise HTTPException(status_code=404, detail="用户不存在或已删除")
 
         new_status = "inactive" if user.get("status") == "active" else "active"
         

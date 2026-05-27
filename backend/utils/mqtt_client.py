@@ -24,7 +24,7 @@ _stop_reconnect: bool = False
 def get_mqtt_config() -> Dict[str, Any]:
     """获取MQTT配置"""
     return {
-        "broker": os.getenv("MQTT_BROKER", "192.168.1.64"),
+        "broker": os.getenv("MQTT_BROKER", "127.0.0.1"),
         "port": int(os.getenv("MQTT_PORT", "1883")),
         "username": os.getenv("MQTT_USERNAME", "admin"),
         "password": os.getenv("MQTT_PASSWORD", "public"),

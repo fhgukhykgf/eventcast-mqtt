@@ -16,7 +16,7 @@ _db = None
 
 def get_database_uri():
     """获取数据库URI"""
-    return os.getenv("MONGODB_URI", "mongodb://192.168.1.64:27017/eventcast")
+    return os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017/eventcast")
 
 
 async def get_database():
