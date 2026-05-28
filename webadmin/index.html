@@ -343,6 +343,11 @@
                 return;
             }
 
+            if (password.length < 6) {
+                showError('password', '密码长度不能少于6个字符');
+                return;
+            }
+
             if (!captchaCode) {
                 showError('captchaCode', '请输入验证码');
                 return;
@@ -385,11 +390,42 @@
                     // 登录失败，刷新验证码
                     refreshCaptcha();
                     document.getElementById('captchaCode').value = '';
-                    
-                    if (result.detail && result.detail.includes('验证码')) {
-                        showError('captchaCode', result.detail);
+
+                    let errorMsg = '登录失败';
+                    let errorField = 'username';
+
+                    // 区分 Pydantic 参数错误和业务错误
+                    if (result.detail) {
+                        if (typeof result.detail === 'string') {
+                            errorMsg = result.detail;
+                        } else if (Array.isArray(result.detail)) {
+                            const first = result.detail[0] || {};
+                            errorMsg = first.msg || '参数错误';
+                            const loc = (first.loc || []).join(' ');
+                            if (loc.includes('password')) errorField = 'password';
+                            else if (loc.includes('captcha')) errorField = 'captchaCode';
+                            
+                            if (errorMsg.includes('String should have at least')) {
+                                errorMsg = '密码长度不能少于6个字符';
+                            } else {
+                                errorMsg = '用户名或密码不正确';
+                                errorField = 'username';
+                            }
+                        } else if (typeof result.detail === 'object') {
+                            errorMsg = result.detail.msg || JSON.stringify(result.detail);
+                        }
+                    } else if (result.msg) {
+                        errorMsg = result.msg;
                     } else {
-                        showError('username', result.detail || result.msg || '登录失败');
+                        errorMsg = '用户名或密码不正确';
+                    }
+
+                    if (errorMsg.includes('验证码') || errorField === 'captchaCode') {
+                        showError('captchaCode', errorMsg);
+                    } else if (errorMsg === '密码长度不能少于6个字符') {
+                        showError('password', errorMsg);
+                    } else {
+                        showError('username', errorMsg);
                     }
                 }
             } catch (err) {

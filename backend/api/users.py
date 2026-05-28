@@ -269,7 +269,7 @@ async def login(login_data: UserLogin, request: Request):
                 status="failed",
                 fail_reason="用户不存在"
             )
-            raise HTTPException(status_code=401, detail="用户不存在")
+            raise HTTPException(status_code=401, detail="用户名或密码不正确")
 
         if user["status"] != "active":
             _record_failed_attempt(ip_address, login_data.identifier)
@@ -293,7 +293,7 @@ async def login(login_data: UserLogin, request: Request):
                 status="failed",
                 fail_reason="密码错误"
             )
-            raise HTTPException(status_code=401, detail="密码错误")
+            raise HTTPException(status_code=401, detail="用户名或密码不正确")
 
         await users.update_one(
             {"_id": user["_id"]},
@@ -460,16 +460,18 @@ async def get_users_list(
         users_col = db["users"]
 
         query = {"is_deleted": {"$ne": True}}
-        # 处理空字符串参数
         if search and search.strip():
-            # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
             import re as _re
-            safe_search = _re.escape(search.strip()[:50])
-            query["$or"] = [
-                {"user_id": {"$regex": safe_search, "$options": "i"}},
-                {"username": {"$regex": safe_search, "$options": "i"}},
-                {"real_name": {"$regex": safe_search, "$options": "i"}}
-            ]
+            safe_search = _re.sub(r'[^\w\u4e00-\u9fa5 -]', '', search.strip()[:50])
+            if safe_search:
+                safe_search = _re.escape(safe_search)
+                query["$or"] = [
+                    {"user_id": {"$regex": safe_search, "$options": "i"}},
+                    {"username": {"$regex": safe_search, "$options": "i"}},
+                    {"real_name": {"$regex": safe_search, "$options": "i"}}
+                ]
+            else:
+                query["_id"] = None  # 过滤后为空，什么也不匹配
         if role and role.strip():
             query["role"] = role.strip()
 

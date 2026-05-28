@@ -412,13 +412,16 @@ async def get_all_applicants(event_id: str, skip: int = 0, limit: int = 50, sear
         
         # 添加搜索过滤
         if search:
-            # 安全：转义正则特殊字符防止 ReDoS，限制搜索长度
             import re as _re
-            safe_search = _re.escape(search[:50])
-            query["$or"] = [
-                {"user_name": {"$regex": safe_search, "$options": "i"}},
-                {"user_id": {"$regex": safe_search, "$options": "i"}}
-            ]
+            safe_search = _re.sub(r'[^\w\u4e00-\u9fa5 -]', '', search[:50])
+            if safe_search:
+                safe_search = _re.escape(safe_search)
+                query["$or"] = [
+                    {"user_name": {"$regex": safe_search, "$options": "i"}},
+                    {"user_id": {"$regex": safe_search, "$options": "i"}}
+                ]
+            else:
+                query["_id"] = None  # 过滤后为空，什么也不匹配
 
         # 计算总数
         total = await db["user_apply"].count_documents(query)

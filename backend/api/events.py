@@ -128,12 +128,15 @@ async def get_events(
         if status:
             query["status"] = status
         if search:
-            # 安全：转义正则特殊字符防止 ReDoS，并限制搜索长度
-            safe_search = regex_module.escape(search[:50])
-            query["$or"] = [
-                {"title": {"$regex": safe_search, "$options": "i"}},
-                {"location": {"$regex": safe_search, "$options": "i"}}
-            ]
+            safe_search = regex_module.sub(r'[^\w\u4e00-\u9fa5 -]', '', search[:50])
+            if safe_search:
+                safe_search = regex_module.escape(safe_search)
+                query["$or"] = [
+                    {"title": {"$regex": safe_search, "$options": "i"}},
+                    {"location": {"$regex": safe_search, "$options": "i"}}
+                ]
+            else:
+                query["_id"] = None  # 过滤后为空，什么也不匹配
 
         total = await events.count_documents(query)
 

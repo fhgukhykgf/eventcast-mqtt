@@ -72,6 +72,7 @@ def setup_logging(
     logging.getLogger("pymongo").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
+    logging.getLogger("watchfiles").setLevel(logging.WARNING)
 
     logging.info(f"日志配置完成 - 级别: {log_level}, 文件: {log_path}")
 
