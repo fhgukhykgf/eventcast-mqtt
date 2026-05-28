@@ -120,27 +120,48 @@ bash run.sh
 
 ### 6. 配置 Nginx 反向代理
 
-创建配置文件 `/etc/nginx/conf.d/eventcast.conf`：
+#### Nginx配置示例
 
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
-
-    # Web 管理后台
+    
     location /admin {
         alias /path/to/eventcast-mqtt/webadmin;
-        index dashboard.html;
-        try_files $uri $uri/ /admin/dashboard.html;
+        index index.html;
+        try_files $uri $uri/ /admin/index.html;
     }
+    
+    # 验证码接口
+        location /captcha {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization";
 
-    # 后端 API
-    location /api {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    }
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_pass http://127.0.0.1:8000/api/users/captcha;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    
+       location /api/ {
+            add_header Access-Control-Allow-Origin "*";
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS";
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization";
+
+            # 关键：OPTIONS 预检请求直接在 Nginx 返回 204，不转发到后端
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            proxy_pass http://127.0.0.1:8000/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
 }
 ```
 

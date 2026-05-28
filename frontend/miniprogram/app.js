@@ -4,8 +4,7 @@ const mqttManager = require('./utils/mqtt.js');
 App({
   globalData: {
     // TODO: 部署时修改为实际服务器地址，建议通过配置文件或环境变量管理
-    baseUrl: 'http://localhost:8000/api',
-    mqttWsUrl: 'ws://localhost:8000/api',
+    baseUrl: 'http://192.168.120.61:8000/api',
     mqttWsUrl: 'ws://192.168.1.64:8083/mqtt',
     userInfo: null,
     token: null

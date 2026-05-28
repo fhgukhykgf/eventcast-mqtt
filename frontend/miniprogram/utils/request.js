@@ -33,19 +33,30 @@ function request(options) {
         }
 
         if (res.statusCode === 401) {
-          wx.showToast({
-            title: '登录已过期，请重新登录',
-            icon: 'none',
-            duration: 2000
-          });
+          // 登录接口的401是账号密码错误，不是token过期
+          const isLoginRequest = options.url.includes('/users/login');
           
-          wx.clearStorageSync();
-          app.globalData.userInfo = null;
-          app.globalData.token = null;
-          
-          setTimeout(() => {
-            wx.reLaunch({ url: '/pages/login/login' });
-          }, 1500);
+          if (isLoginRequest) {
+            wx.showToast({
+              title: '用户名或密码不正确',
+              icon: 'none',
+              duration: 2000
+            });
+          } else {
+            wx.showToast({
+              title: '登录已过期，请重新登录',
+              icon: 'none',
+              duration: 2000
+            });
+            
+            wx.clearStorageSync();
+            app.globalData.userInfo = null;
+            app.globalData.token = null;
+            
+            setTimeout(() => {
+              wx.reLaunch({ url: '/pages/login/login' });
+            }, 1500);
+          }
           
           reject(new Error('Unauthorized'));
           return;
