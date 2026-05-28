@@ -1,48 +1,37 @@
-# EventCast-MQTT 部署指南
+# EventCast部署指南
 
 ## 系统要求
 
-### 最低配置
-- **CPU**: 1核
-- **内存**: 2GB
-- **磁盘**: 20GB
-- **操作系统**: Ubuntu 20.04 / CentOS 7+
-
 ### 推荐配置
+
 - **CPU**: 2核
 - **内存**: 4GB
 - **磁盘**: 50GB
-- **操作系统**: Ubuntu 22.04 LTS
+- **操作系统**: CentOS Stream 9
 
----
+***
 
 ## 环境准备
 
 ### 1. 安装 Python 3.9+
 
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install python3.9 python3.9-dev python3-pip
-
-# CentOS/RHEL
-sudo yum install python39 python39-devel
-
-# 验证安装
+sudo dnf install -y python39 python39-devel python3-pip
 python3.9 --version
 pip3 --version
 ```
-
 ### 2. 安装 MongoDB 5.0+
-
 ```bash
-# Ubuntu 20.04
-wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | sudo apt-key add -
-echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
-sudo apt update
-sudo apt install -y mongodb-org
+cat <<EOF | sudo tee /etc/yum.repos.d/mongodb-org-5.0.repo
+[mongodb-org-5.0]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/8/mongodb-org/5.0/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-5.0.asc
+EOF
 
-# 启动服务
+sudo dnf install -y mongodb-org
 sudo systemctl start mongod
 sudo systemctl enable mongod
 
@@ -53,9 +42,9 @@ mongod --version
 ### 3. 安装 EMQX 4.4+
 
 ```bash
-# Ubuntu/Debian
+# CentOS Stream 9
 curl -s https://assets.emqx.com/scripts/install-emqx-deb.sh | sudo bash
-sudo apt-get install emqx
+sudo dnf install -y emqx
 
 # 启动服务
 sudo systemctl start emqx
@@ -68,18 +57,15 @@ emqx version
 ### 4. 安装 Nginx
 
 ```bash
-# Ubuntu/Debian
-sudo apt install nginx
-
-# CentOS/RHEL
-sudo yum install nginx
+# CentOS Stream 9
+sudo dnf install -y nginx
 
 # 启动服务
 sudo systemctl start nginx
 sudo systemctl enable nginx
 ```
 
----
+***
 
 ## 部署步骤
 
@@ -166,7 +152,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
----
+***
 
 ## 生产环境注意事项
 
@@ -176,7 +162,7 @@ sudo systemctl reload nginx
 - **防火墙**：仅对外开放 80/443 端口，8000 端口仅限本机访问
 - **日志目录**：确保 `backend/logs/` 目录有写权限
 
----
+***
 
 ## 验证部署
 
@@ -187,3 +173,4 @@ curl http://localhost:8000/api/health
 # 访问 API 文档
 # 浏览器打开 http://your-domain.com:8000/docs
 ```
+
