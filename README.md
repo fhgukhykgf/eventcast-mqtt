@@ -161,7 +161,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 #### 微信小程序
 
 - 使用微信开发者工具加载 `frontend/miniprogram` 目录
-- 修改 `app.js` 中的 `baseUrl` 为你的服务器地址 
+- 修改 `app.js` 中的 `baseUrl`, `mqttWsUrl` 为你的服务器地址 
 
 #### Nginx配置示例
 
