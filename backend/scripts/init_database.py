@@ -13,11 +13,17 @@ from utils.auth import hash_password
 
 async def init_database():
     """初始化数据库"""
-    db = await get_database()
+    try:
+        db = await get_database()
+    except Exception as e:
+        print(f"❌ 数据库连接失败: {e}")
+        print("请确保MongoDB服务已启动，并检查.env中的MONGODB_URI配置")
+        return
 
-    collections = ["events", "users", "user_apply", "sign_records"]
+    collections = ["events", "users", "user_apply", "sign_records", "operation_logs", "login_logs"]
+    existing = await db.list_collection_names()
     for col in collections:
-        if col not in await db.list_collection_names():
+        if col not in existing:
             await db.create_collection(col)
             print(f"创建集合: {col}")
 
@@ -30,6 +36,12 @@ async def init_database():
 
     await db.user_apply.create_index([("event_id", 1), ("user_id", 1)], unique=True)
     await db.sign_records.create_index([("event_id", 1), ("user_id", 1)], unique=True)
+
+    await db.operation_logs.create_index("created_at")
+    await db.operation_logs.create_index([("user_id", 1), ("created_at", -1)])
+
+    await db.login_logs.create_index("login_time")
+    await db.login_logs.create_index([("user_id", 1), ("login_time", -1)])
 
     print("索引创建完成")
 
@@ -76,7 +88,7 @@ async def init_database():
         existing = await db.users.find_one({"user_id": user["user_id"]})
         if not existing:
             await db.users.insert_one(user)
-            print(f"创建测试用户: {user['user_id']}")
+            print(f"创建测试用户: {user['user_id']} ({user['role']})")
 
     print("数据库初始化完成")
 
