@@ -49,7 +49,7 @@
                                   │                         │
                                   ▼                         ▼
                          ┌─────────────────┐       ┌─────────────────┐
-                         │  MongoDB数据库   │        │  EMQX MQTT代理   │
+                         │  MongoDB数据库   │       │  EMQX MQTT代理   │
                          └─────────────────┘       └─────────────────┘
 ```
 
@@ -114,7 +114,7 @@ eventcast-mqtt/
 - **Python 3.9+**：安装Python环境
 - **微信开发者工具**：用于加载小程序项目
 
-### 2. 安装部署
+### 2. 部署步骤
 
 #### 克隆仓库
 
@@ -161,7 +161,7 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 #### 微信小程序
 
 - 使用微信开发者工具加载 `frontend/miniprogram` 目录
-- 修改 `app.js` 中的 `baseUrl` 为你的服务器地址
+- 修改 `app.js` 中的 `baseUrl` 为你的服务器地址 
 
 #### Nginx配置示例
 
